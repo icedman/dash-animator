@@ -1,0 +1,11 @@
+{
+  "name": "dash-animator",
+  "version": "1.0.1",
+  "main": "index.js",
+  "repository": "git@github.com:icedman/dash-animator",
+  "author": "icedman <m4rvin2005@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "pretty": "prettier --single-quote --write \"**/*.js\""
+   }
+}
