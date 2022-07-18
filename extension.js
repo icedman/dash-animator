@@ -21,14 +21,23 @@ const setInterval = Me.imports.utils.setInterval;
 const clearInterval = Me.imports.utils.clearInterval;
 const clearTimeout = Me.imports.utils.clearTimeout;
 
-const MAX_SCALE = 1.5;
+const MAX_SCALE = 1.8;
 
 class Extension {
   enable() {
     this._addEvents();
 
     this.dashContainerEvents = [];
-    this._coldStartId = setTimeout(this._onEnterEvent.bind(this), 4000);
+
+    if (this._findDashContainer()) {
+      this._coldStartId = setTimeout(this._onEnterEvent.bind(this), 500);
+    } else {
+      this._startUpId = Main.layoutManager.connect(
+        'startup-complete',
+        this._onEnterEvent.bind(this)
+      );
+    }
+
     this._autoHideSpyId = setInterval(this._onAutoHideSpyEvent.bind(this), 250);
 
     this.animationContainer = new St.Widget({ name: 'animationContainer' });
@@ -39,22 +48,32 @@ class Extension {
 
   disable() {
     this._removeEvents();
-    
+
     if (this._coldStartId) {
+      log('_coldStartId');
       clearInterval(this._coldStartId);
       this._coldStartId = null;
     }
 
+    if (this._startUpId) {
+      log('_startUpId');
+      Main.layoutManager.disconnect(this._startUpId);
+      this._startUpId = null;
+    }
+
     if (this._autoHideSpyId) {
+      log('_autoHideSpyId');
       clearInterval(this._autoHideSpyId);
       this._autoHideSpyId = null;
     }
 
     if (this._intervalId) {
+      log('_intervalId');
       clearInterval(this._intervalId);
       this._intervalId = null;
     }
     if (this._timeoutId) {
+      log('_timeoutId');
       clearTimeout(this._timeoutId);
       this._timeoutId = null;
     }
@@ -68,24 +87,33 @@ class Extension {
     }
 
     if (this.icons) {
-      this.icons.forEach((b) => {
-        if (!b._icon) return;
-        b._icon.show();
-        b.size = null;
-        b._icon = null;
-        b._animIconContainer.set_gicon(null);
-        b._animIconContainer.icon_name = null;
-        b._animIconContainer = null;
-        b._orphan = false;
+      try {
+        this.icons.forEach((b) => {
+          if (!b._icon) return;
+          b._icon.show();
+          b.size = null;
+          b._icon = null;
+          b._animIconContainer.set_gicon(null);
+          b._animIconContainer.icon_name = null;
+          b._animIconContainer = null;
+          b._orphan = false;
 
-        if (!this._dragging && b._draggable) {
-          b._draggable.disconnect(b._draggable._dragBeginId);
-          b._draggable._dragBeginId = null;
-          b._draggable.disconnect(b._draggable._dragEndId);
-          b._draggable._dragEndId = null;
-          b._draggable = null;
-        }
-      });
+          if (!this._dragging && b._draggable) {
+            if (b._draggable._dragBeginId) {
+              b._draggable.disconnect(b._draggable._dragBeginId);
+              b._draggable._dragBeginId = null;
+            }
+            if (b._draggable._dragEndId) {
+              b._draggable.disconnect(b._draggable._dragEndId);
+              b._draggable._dragEndId = null;
+            }
+            b._draggable = null;
+          }
+        });
+      } catch (err) {
+        //
+      }
+
       this.icons = [];
     }
 
@@ -93,7 +121,7 @@ class Extension {
       Main.uiGroup.remove_child(this.animationContainer);
       this.animationContainer = null;
     }
-    
+
     log('dash animator disabled');
   }
 
@@ -101,32 +129,33 @@ class Extension {
     log('finding dashtodockContainer');
     this.dashContainer = Main.uiGroup.find_child_by_name('dashtodockContainer');
     if (this.dashContainer) {
-      // if (this._findDashContainerIntervalId) {
-      // clearInterval(this._findDashContainerIntervalId);
-      // this._findDashContainerIntervalId = null;
-      // }
       log('container found');
 
       // this.dashContainer.add_style_class_name('hi');
       this._findDash();
-      
+
       this.dashContainer.set_reactive(true);
       this.dashContainer.set_track_hover(true);
 
-      this.dashContainerEvents.push(this.dashContainer.connect(
-        'motion-event',
-        this._onMotionEvent.bind(this)
-      ));
-      this.dashContainerEvents.push(this.dashContainer.connect(
-        'enter-event',
-        this._onEnterEvent.bind(this)
-      ));
-      this.dashContainerEvents.push(this.dashContainer.connect(
-        'leave-event',
-        this._onLeaveEvent.bind(this)
-      ));
+      this.dashContainerEvents.push(
+        this.dashContainer.connect(
+          'motion-event',
+          this._onMotionEvent.bind(this)
+        )
+      );
+      this.dashContainerEvents.push(
+        this.dashContainer.connect('enter-event', this._onEnterEvent.bind(this))
+      );
+      this.dashContainerEvents.push(
+        this.dashContainer.connect('leave-event', this._onLeaveEvent.bind(this))
+      );
+      this.dashContainerEvents.push(
+        this.dashContainer.connect('destroy', this._restart.bind(this))
+      );
+
+      return true;
     }
-    return 
+    return false;
   }
 
   _findDash() {
@@ -153,32 +182,32 @@ class Extension {
 
     // scrollview children
     children.forEach((c) => {
-        let label = c.label;
-        let appwell = c.first_child;
-        if (!appwell) return; // separator?
+      let label = c.label;
+      let appwell = c.first_child;
+      if (!appwell) return; // separator?
 
-        let draggable = appwell._draggable;
-        let widget = appwell.first_child;
-        let icongrid = widget.first_child;
-        let boxlayout = icongrid.first_child;
-        let bin = boxlayout.first_child;
-        let icon = bin.first_child;
+      let draggable = appwell._draggable;
+      let widget = appwell.first_child;
+      let icongrid = widget.first_child;
+      let boxlayout = icongrid.first_child;
+      let bin = boxlayout.first_child;
+      let icon = bin.first_child;
 
-        bin._draggable = draggable;
-        bin._label = label;
-        bin._orphan = false;
-        new_icons.push(bin);
+      bin._draggable = draggable;
+      bin._label = label;
+      bin._orphan = false;
+      new_icons.push(bin);
 
-        if (draggable && !draggable._dragBeginId) {
-          draggable._dragBeginId = draggable.connect('drag-begin', () => {
-            this._dragging = true;
-            this.disable();
-          });
-          draggable._dragEndId = draggable.connect('drag-end', () => {
-            this._dragging = false;
-              this.enable();
-          });
-        }
+      if (draggable && !draggable._dragBeginId) {
+        draggable._dragBeginId = draggable.connect('drag-begin', () => {
+          this._dragging = true;
+          this.disable();
+        });
+        draggable._dragEndId = draggable.connect('drag-end', () => {
+          this._dragging = false;
+          this.enable();
+        });
+      }
     });
 
     // apps button
@@ -211,24 +240,26 @@ class Extension {
   _addEvents() {
     this._overViewEvents = [];
 
-    this._overViewEvents.push(Main.overview.connect(
-      'showing',
-      this._onOverviewShowing.bind(this)
-    ));
-    this._overViewEvents.push(Main.overview.connect(
-      'hidden',
-      this._onOverviewHidden.bind(this)
-    ));
+    this._overViewEvents.push(
+      Main.overview.connect('showing', this._onOverviewShowing.bind(this))
+    );
+    this._overViewEvents.push(
+      Main.overview.connect('hidden', this._onOverviewHidden.bind(this))
+    );
 
     this._displayEvents = [];
-    this._displayEvents.push(global.display.connect(
-      'notify::focus-window',
-      this._onFocusWindow.bind(this)
-    ));
-    this._displayEvents.push(global.display.connect(
-      'in-fullscreen-changed',
-      this._onFullScreen.bind(this)
-    ));
+    this._displayEvents.push(
+      global.display.connect(
+        'notify::focus-window',
+        this._onFocusWindow.bind(this)
+      )
+    );
+    this._displayEvents.push(
+      global.display.connect(
+        'in-fullscreen-changed',
+        this._onFullScreen.bind(this)
+      )
+    );
   }
 
   _removeEvents() {
@@ -261,6 +292,10 @@ class Extension {
   }
 
   _onEnterEvent() {
+    if (this._coldStartId) {
+      clearInterval(this._coldStartId);
+      this._coldStartId = null;
+    }
     this._inDash = true;
     this._beginAnimation();
     this._debounceEndAnimation();
@@ -280,12 +315,19 @@ class Extension {
     log('_onFullScreen');
   }
 
+  _restart() {
+    log('restart');
+    this.disable();
+    this.enable();
+  }
+
   _animate() {
     if (!this.dashContainer) {
       this._findDashContainer();
     }
     if (!this.dashContainer) return;
 
+    let dockPosition = this._queryPosition();
     let pointer = global.get_pointer();
 
     let nearestIdx = -1;
@@ -302,17 +344,20 @@ class Extension {
 
     this.dashContainer._icons = this.icons;
 
+    let pivot = new Point();
+    pivot.x = 0.5;
+    pivot.y = 0.5;
+
+    // if (dockPosition === 'left') {
+    //   pivot.x = 1;
+    // } else  if (dockPosition === 'right') {
+    //   pivot.x = 0;
+    // }
+
     let idx = 0;
     this.icons.forEach((b) => {
-
       if (!b._animIconContainer) {
         b._animIconContainer = new St.Icon({ name: 'animIcon' });
-
-        let pivot = new Point();
-        pivot.x = 0.5;
-        pivot.y = 0.5;
-        b._animIconContainer.pivot_point = pivot;
-
         let icon_name = b.first_child.get_icon_name();
         if (icon_name) {
           b._animIconContainer.icon_name = icon_name;
@@ -322,11 +367,12 @@ class Extension {
         this.animationContainer.add_child(b._animIconContainer);
       }
 
+      b._animIconContainer.pivot_point = pivot;
       let bpos = this._get_position(b);
 
       let bposcenter = [...bpos];
-      bposcenter[0] += b.first_child.size.width/2;
-      bposcenter[1] -= b.first_child.size.height/2;
+      bposcenter[0] += b.first_child.size.width / 2;
+      bposcenter[1] -= b.first_child.size.height / 2;
       let dst = this._get_distance(pointer, bposcenter);
 
       if (nearestDistance == -1 || nearestDistance > dst) {
@@ -341,11 +387,10 @@ class Extension {
       b._animIconContainer._target = bpos;
       b._animIconContainer._targetScale = 1;
 
-      if (!b._icon) {
-        b._icon = b.first_child;
-        b._icon.hide();
-        b.size = b._icon.size;
-      }
+      // hide existing icon
+      b._icon = b.first_child;
+      b._icon.hide();
+      b.size = b._icon.size;
 
       b._animIconContainer.size = b._icon.size;
 
@@ -356,28 +401,51 @@ class Extension {
       let pos = nearestIcon._animIconContainer._target;
       let current_scale = nearestIcon._animIconContainer.get_scale()[0];
 
+      let py = 20;
+
       // scale & position target icon
-      pos[1] -= 20;
+      pos[1] -= py;
       nearestIcon._animIconContainer._target = pos;
       nearestIcon._animIconContainer._targetScale = MAX_SCALE;
 
+      let labelX = this._get_x(nearestIcon._animIconContainer);
       let labelY = this._get_y(nearestIcon._animIconContainer);
-      labelY = labelY - (nearestIcon._animIconContainer.size.height * MAX_SCALE) * 0.75;
-      if (!isNaN(labelY)) {
+
+      if (dockPosition === 'bottom') {
+        labelY =
+          labelY -
+          nearestIcon._animIconContainer.size.height * MAX_SCALE * 0.75;
+      } else {
+        if (dockPosition === 'left') {
+          labelX =
+            labelX +
+            nearestIcon._animIconContainer.size.height * MAX_SCALE * 0.75;
+        } else {
+          labelX =
+            labelX -
+            nearestIcon._animIconContainer.size.height * MAX_SCALE * 0.75;
+        }
+      }
+      if (!isNaN(labelX) && !isNaN(labelY)) {
+        nearestIcon._label.x = labelX;
         nearestIcon._label.y = labelY;
       }
 
       // scale & position other icons
       let offset = 10;
       let sz = current_scale;
-      for(let idx = 1; idx<100; idx++) {
+      for (let idx = 1; idx < 100; idx++) {
         let left = nearestIdx - idx;
         let right = nearestIdx + idx;
-        sz *= 0.92;
+        sz *= 0.6;
         if (sz < 1) sz = 1;
+
+        py *= 0.6;
+
         if (left >= 0) {
           let pos = this.icons[left]._animIconContainer._target;
           pos[0] -= offset;
+          pos[1] -= py;
           this.icons[left]._animIconContainer._target = pos;
           this.icons[left]._animIconContainer._targetScale = sz;
         } else {
@@ -386,6 +454,7 @@ class Extension {
         if (right < this.icons.length) {
           let pos = this.icons[right]._animIconContainer._target;
           pos[0] += offset;
+          pos[1] -= py;
           this.icons[right]._animIconContainer._target = pos;
           this.icons[right]._animIconContainer._targetScale = sz;
         } else {
@@ -401,15 +470,23 @@ class Extension {
     idx = 0;
     this.icons.forEach((b) => {
       let _idx = nearestIdx - idx;
-      let pos = b._animIconContainer._target;
+      let pos = b._animIconContainer.get_position();
       let scale = b._animIconContainer._targetScale;
 
+      let dst = this._get_distance(pos, b._animIconContainer._target);
+      if (dst > 20) {
+        pos = b._animIconContainer._target;
+      } else {
+        pos[0] = (pos[0] * coef + b._animIconContainer._target[0]) / (coef + 1);
+        pos[1] = (pos[1] * coef + b._animIconContainer._target[1]) / (coef + 1);
+      }
+
       let current_scale = b._animIconContainer.get_scale()[0];
-      scale = ((current_scale * coef) + scale)/(coef+1);
+      scale = (current_scale * coef + scale) / (coef + 1);
 
       b._animIconContainer.set_position(pos[0], pos[1]);
       b._animIconContainer.set_scale(scale, scale);
-      idx ++;
+      idx++;
     });
   }
 
@@ -446,37 +523,49 @@ class Extension {
     if (!this.dashContainer) return;
     let pos1 = this.dashContainer.get_position();
     let pos2 = this.animationContainer.get_position();
-    if (pos1[0] != pos2[0] || (pos1[1] - this.dashContainer.size.height) != pos2[1]) {
+    if (
+      pos1[0] != pos2[0] ||
+      pos1[1] - this.dashContainer.size.height != pos2[1]
+    ) {
       this._onEnterEvent();
     }
   }
 
+  _queryPosition() {
+    if (!this.dashContainer) return '?';
+    let pos = this.dashContainer.get_position();
+    let primaryMonitorNumber = global.display.get_primary_monitor();
+    let box = global.display.get_monitor_geometry(primaryMonitorNumber);
+
+    if (pos[0] < box.width / 2) {
+      this._position = 'left';
+    } else {
+      this._position = 'right';
+    }
+    if (pos[1] > box.height / 2) {
+      this._position = 'bottom';
+    }
+    return this._position;
+  }
+
   _get_x(obj) {
     if (obj == null) return 0;
-    // let x = obj.get_position()[0];
-    // let parent = obj.get_parent();
-    // if (parent) return x + this._get_x(parent);
-    // return x;
     return obj.get_transformed_position()[0];
   }
 
   _get_y(obj) {
     if (obj == null) return 0;
-    // let y = obj.get_position()[1];
-    // let parent = obj.get_parent();
-    // if (parent) return y + this._get_y(parent);
-    // return y;
     return obj.get_transformed_position()[1];
   }
 
   _get_position(obj) {
-    return [ this._get_x(obj), this._get_y(obj)];
+    return [this._get_x(obj), this._get_y(obj)];
   }
 
   _get_distance_sqr(pos1, pos2) {
     let a = pos1[0] - pos2[0];
     let b = pos1[1] - pos2[1];
-    return (a * a) + (b * b);
+    return a * a + b * b;
   }
 
   _get_distance(pos1, pos2) {
