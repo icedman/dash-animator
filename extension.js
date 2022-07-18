@@ -348,12 +348,6 @@ class Extension {
     pivot.x = 0.5;
     pivot.y = 0.5;
 
-    // if (dockPosition === 'left') {
-    //   pivot.x = 1;
-    // } else  if (dockPosition === 'right') {
-    //   pivot.x = 0;
-    // }
-
     let idx = 0;
     this.icons.forEach((b) => {
       if (!b._animIconContainer) {
@@ -372,7 +366,7 @@ class Extension {
 
       let bposcenter = [...bpos];
       bposcenter[0] += b.first_child.size.width / 2;
-      bposcenter[1] -= b.first_child.size.height / 2;
+      bposcenter[1] += b.first_child.size.height / 2;
       let dst = this._get_distance(pointer, bposcenter);
 
       if (nearestDistance == -1 || nearestDistance > dst) {
@@ -403,8 +397,22 @@ class Extension {
 
       let py = 20;
 
+      let _ix = 1;
+      let _iy = 0;
+      let _inv = 1;
+
       // scale & position target icon
-      pos[1] -= py;
+      if (dockPosition === 'bottom') {
+        pos[1] -= py;
+        _ix = 0;
+        _iy = 1;
+      } else if (dockPosition === 'left') {
+        pos[0] += py;
+        _inv = -1;
+      } else {
+        pos[0] -= py;
+      }
+
       nearestIcon._animIconContainer._target = pos;
       nearestIcon._animIconContainer._targetScale = MAX_SCALE;
 
@@ -419,11 +427,11 @@ class Extension {
         if (dockPosition === 'left') {
           labelX =
             labelX +
-            nearestIcon._animIconContainer.size.height * MAX_SCALE * 0.75;
+            nearestIcon._animIconContainer.size.width * MAX_SCALE * 0.75;
         } else {
           labelX =
             labelX -
-            nearestIcon._animIconContainer.size.height * MAX_SCALE * 0.75;
+            nearestIcon._animIconContainer.size.width * MAX_SCALE * 0.75;
         }
       }
       if (!isNaN(labelX) && !isNaN(labelY)) {
@@ -444,8 +452,8 @@ class Extension {
 
         if (left >= 0) {
           let pos = this.icons[left]._animIconContainer._target;
-          pos[0] -= offset;
-          pos[1] -= py;
+          pos[_ix] -= offset;
+          pos[_iy] -= py * _inv;
           this.icons[left]._animIconContainer._target = pos;
           this.icons[left]._animIconContainer._targetScale = sz;
         } else {
@@ -453,8 +461,8 @@ class Extension {
         }
         if (right < this.icons.length) {
           let pos = this.icons[right]._animIconContainer._target;
-          pos[0] += offset;
-          pos[1] -= py;
+          pos[_ix] += offset;
+          pos[_iy] -= py * _inv;
           this.icons[right]._animIconContainer._target = pos;
           this.icons[right]._animIconContainer._targetScale = sz;
         } else {
@@ -466,7 +474,7 @@ class Extension {
     }
 
     // animate!
-    let coef = 5;
+    let coef = 3;
     idx = 0;
     this.icons.forEach((b) => {
       let _idx = nearestIdx - idx;
