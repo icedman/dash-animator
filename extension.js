@@ -69,6 +69,7 @@ class Extension {
 
     if (this.icons) {
       this.icons.forEach((b) => {
+        if (!b._icon) return;
         b._icon.show();
         b.size = null;
         b._icon = null;
@@ -76,12 +77,22 @@ class Extension {
         b._animIconContainer.icon_name = null;
         b._animIconContainer = null;
         b._orphan = false;
+
+        if (!this._dragging && b._draggable) {
+          b._draggable.disconnect(b._draggable._dragBeginId);
+          b._draggable._dragBeginId = null;
+          b._draggable.disconnect(b._draggable._dragEndId);
+          b._draggable._dragEndId = null;
+          b._draggable = null;
+        }
       });
       this.icons = [];
     }
 
-    Main.uiGroup.remove_child(this.animationContainer);
-    this.animationContainer = null;
+    if (this.animationContainer) {
+      Main.uiGroup.remove_child(this.animationContainer);
+      this.animationContainer = null;
+    }
     
     log('dash animator disabled');
   }
@@ -145,15 +156,29 @@ class Extension {
         let label = c.label;
         let appwell = c.first_child;
         if (!appwell) return; // separator?
+
+        let draggable = appwell._draggable;
         let widget = appwell.first_child;
         let icongrid = widget.first_child;
         let boxlayout = icongrid.first_child;
         let bin = boxlayout.first_child;
         let icon = bin.first_child;
 
+        bin._draggable = draggable;
         bin._label = label;
         bin._orphan = false;
         new_icons.push(bin);
+
+        if (draggable && !draggable._dragBeginId) {
+          draggable._dragBeginId = draggable.connect('drag-begin', () => {
+            this._dragging = true;
+            this.disable();
+          });
+          draggable._dragEndId = draggable.connect('drag-end', () => {
+            this._dragging = false;
+              this.enable();
+          });
+        }
     });
 
     // apps button
@@ -279,6 +304,7 @@ class Extension {
 
     let idx = 0;
     this.icons.forEach((b) => {
+
       if (!b._animIconContainer) {
         b._animIconContainer = new St.Icon({ name: 'animIcon' });
 
@@ -302,6 +328,7 @@ class Extension {
       bposcenter[0] += b.first_child.size.width/2;
       bposcenter[1] -= b.first_child.size.height/2;
       let dst = this._get_distance(pointer, bposcenter);
+
       if (nearestDistance == -1 || nearestDistance > dst) {
         nearestDistance = dst;
         nearestIcon = b;
@@ -313,7 +340,6 @@ class Extension {
 
       b._animIconContainer._target = bpos;
       b._animIconContainer._targetScale = 1;
-      // b._animIconContainer.set_position(bpos[0], bpos[1]);
 
       if (!b._icon) {
         b._icon = b.first_child;
@@ -322,10 +348,6 @@ class Extension {
       }
 
       b._animIconContainer.size = b._icon.size;
-      // b._animIconContainer.set_scale(1,1);
-
-      let labelY = this._get_y(b._animIconContainer);
-      b._label.y = labelY;
 
       idx++;
     });
@@ -340,7 +362,10 @@ class Extension {
       nearestIcon._animIconContainer._targetScale = MAX_SCALE;
 
       let labelY = this._get_y(nearestIcon._animIconContainer);
-      nearestIcon._label.y = labelY - (nearestIcon._animIconContainer.size.height * MAX_SCALE) * 0.75;
+      labelY = labelY - (nearestIcon._animIconContainer.size.height * MAX_SCALE) * 0.75;
+      if (!isNaN(labelY)) {
+        nearestIcon._label.y = labelY;
+      }
 
       // scale & position other icons
       let offset = 10;
