@@ -8,3 +8,6 @@
 .hi {
 	border:  1px solid magenta;
 }
+
+  #dashtodockContainer.bottom #dash .dash-item-container .app-well-app.focused .overview-icon {
+    background-color: rgba(238, 238, 236, 0.08) !important; }

@@ -35,15 +35,21 @@ const setInterval = Me.imports.utils.setInterval;
 const clearInterval = Me.imports.utils.clearInterval;
 const clearTimeout = Me.imports.utils.clearTimeout;
 
+const ANIMATION_INTERVAL = 50;
+const ANIMATION_POS_COEF = 2;
+const ANIMATION_SCALE_COEF = 4;
+const ANIM_ICON_RAISE = 0.15;
+const ANIM_ICON_SCALE = 1.5;
+
 class Extension {
   constructor() {}
 
   enable() {
     log('enable watch');
 
-    this._iconsContainer = new St.Widget({ name: 'icons_container' });
-    this._iconsContainer.hide();
+    this._iconsContainer = new St.Widget({ name: 'iconsContainer' });
     Main.uiGroup.add_child(this._iconsContainer);
+    this._iconsContainer.hide();
 
     this._overViewEvents = [];
     this._overViewEvents.push(
@@ -127,6 +133,7 @@ class Extension {
     this._layoutManagerEvents = [];
 
     if (this._iconsContainer) {
+      this._iconsContainer.show();
       Main.uiGroup.remove_child(this._iconsContainer);
       delete this._iconsContainer;
       this._iconsContainer = null;
@@ -212,6 +219,8 @@ class Extension {
       let bin = boxlayout.first_child;
       let icon = bin.first_child;
 
+      bin._draggable = draggable;
+      bin._label = label;
       icons.push(bin);
     });
 
@@ -224,8 +233,8 @@ class Extension {
       let boxlayout = icongrid.first_child;
       let bin = boxlayout.first_child;
       let icon = bin.first_child;
-      bin._label = label;
 
+      bin._label = label;
       bin._apps = true;
       icons.push(bin);
     }
@@ -234,7 +243,8 @@ class Extension {
   }
 
   _updateIcons() {
-    let containerPos = this._get_position(this._iconsContainer);
+    if (!this._iconsContainer) return;
+
     let existingIcons = this._iconsContainer.get_children();
 
     if (!this._iconsContainer.visible) {
@@ -243,6 +253,10 @@ class Extension {
       }
       return;
     }
+
+    let pivot = new Point();
+    pivot.x = 0.5;
+    pivot.y = 1.0;
 
     let icons = this._findIcons();
     icons.forEach((bin) => {
@@ -259,10 +273,34 @@ class Extension {
       if (!uiIcon.icon_name) {
         uiIcon.gicon = icon.gicon;
       }
+      uiIcon.pivot_point = pivot;
 
       uiIcon._bin = bin;
       this._iconsContainer.add_child(uiIcon);
+
+      // spy dragging events
+      let draggable = bin._draggable;
+      if (draggable && !draggable._dragBeginId) {
+        draggable._dragBeginId = draggable.connect('drag-begin', () => {
+          this._dragging = true;
+          this.disable();
+        });
+        draggable._dragEndId = draggable.connect('drag-end', () => {
+          this._dragging = false;
+          this.disable();
+          this.enable();
+        });
+      }
     });
+
+    let pointer = global.get_pointer();
+
+    let nearestIdx = -1;
+    let nearestIcon = null;
+    let nearestDistance = -1;
+    let iconSize = null;
+
+    let idx = 0;
 
     let animateIcons = this._iconsContainer.get_children();
     animateIcons.forEach((icon) => {
@@ -279,26 +317,80 @@ class Extension {
         return;
       }
 
-      let pos = this._get_position(icon._bin);
-      pos[1] -= 10;
+      let bin = icon._bin;
+      let pos = this._get_position(bin);
 
-      // pos[0] -= containerPos[0];
-      // pos[1] -= containerPos[1];
+      let size = bin.first_child.get_size();
+      if (!iconSize) {
+        iconSize = size;
+      }
+      bin.set_size(size[0], size[1]);
 
-      let size = icon._bin.first_child.get_size();
-      icon._bin.set_size(size[0], size[1]);
-      if (icon._bin._apps) {
-        icon._bin.first_child.add_style_class_name('invisible');
+      // get nearest
+      let bposcenter = [...pos];
+      bposcenter[0] += bin.first_child.size.width / 2;
+      bposcenter[1] += bin.first_child.size.height / 2;
+      let dst = this._get_distance(pointer, bposcenter);
+
+      if ((nearestDistance == -1 || nearestDistance > dst) && dst < size[0] * 0.8) {
+        nearestDistance = dst;
+        nearestIcon = icon;
+        nearestIdx = idx;
+        icon._distance = dst;
+      }
+
+      if (bin._apps) {
+        bin.first_child.add_style_class_name('invisible');
       } else {
-        icon._bin.first_child.hide();
+        bin.first_child.hide();
+      }
+      icon._target = pos;
+      icon._targetScale = 1;
+
+      idx++;
+    });
+
+    // set animation behavior here
+    if (nearestIcon && nearestDistance < iconSize[0] * 2) {
+      nearestIcon._target[1] -= iconSize[0] * ANIM_ICON_RAISE;
+      nearestIcon._targetScale = ANIM_ICON_SCALE;
+    }
+
+    let didAnimate = false;
+
+    // animate to target scale and position
+    animateIcons = this._iconsContainer.get_children();
+    animateIcons.forEach((icon) => {
+
+      let pos = icon._target;
+      let scale = icon._targetScale;
+      let fromScale = icon.get_scale()[0];
+
+      icon.set_scale(1, 1);
+      let from = this._get_position(icon);
+      let dst = this._get_distance(from, icon._target);
+
+      if (dst > iconSize[0] * 0.01 && dst < iconSize[0] * 3) {
+        pos[0] = ((from[0] * ANIMATION_POS_COEF) + pos[0]) / (ANIMATION_POS_COEF+1);
+        pos[1] = ((from[1] * ANIMATION_POS_COEF) + pos[1]) / (ANIMATION_POS_COEF+1);
+        scale = ((fromScale * ANIMATION_SCALE_COEF) + scale) / (ANIMATION_SCALE_COEF+1);
+        didAnimate = true;
+      }
+
+      if (!isNaN(scale)) {
+        icon.set_scale(scale, scale);
       }
 
       if (!isNaN(pos[0]) && !isNaN(pos[1])) {
         // why does NaN happen?
         icon.set_position(pos[0], pos[1]);
       }
+
     });
 
+    if (didAnimate) {
+      this._debounceEndAnimation();
+    }
   }
 
   _restoreIcons() {
@@ -323,18 +415,34 @@ class Extension {
     return [this._get_x(obj), this._get_y(obj)];
   }
 
+  _get_distance_sqr(pos1, pos2) {
+    let a = pos1[0] - pos2[0];
+    let b = pos1[1] - pos2[1];
+    return a * a + b * b;
+  }
+
+  _get_distance(pos1, pos2) {
+    return Math.sqrt(this._get_distance_sqr(pos1, pos2));
+  }
+
+  _get_vector(from, to) {
+    let a = to[0] - from[0];
+    let b = to[1] - from[1];
+    return [a, b];
+  }
+
   _beginAnimation() {
     if (this._timeoutId) {
       clearInterval(this._timeoutId);
       this._timeoutId = null;
     }
     if (this._intervalId == null) {
-      this._intervalId = setInterval(this._animate.bind(this), 50);
+      this._intervalId = setInterval(this._animate.bind(this), ANIMATION_INTERVAL);
     }
 
-    // if (this._iconsContainer) {
-    //   this._iconsContainer.add_style_class_name('hi');
-    // }
+    if (this.dashContainer) {
+      // this.dashContainer.add_style_class_name('hi');
+    }
   }
 
   _endAnimation() {
@@ -343,8 +451,9 @@ class Extension {
       this._intervalId = null;
     }
     this._timeoutId = null;
-    if (this._iconsContainer) {
-      this._iconsContainer.remove_style_class_name('hi');
+    
+    if (this.dashContainer) {
+      this.dashContainer.remove_style_class_name('hi');
     }
   }
 
