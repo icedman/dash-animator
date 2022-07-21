@@ -35,18 +35,17 @@ const setInterval = Me.imports.utils.setInterval;
 const clearInterval = Me.imports.utils.clearInterval;
 const clearTimeout = Me.imports.utils.clearTimeout;
 
-const ANIMATION_INTERVAL = 50;
+const ANIMATION_INTERVAL = 25;
 const ANIMATION_POS_COEF = 2;
-const ANIMATION_SCALE_COEF = 4;
+const ANIMATION_PULL_COEF = 3;
+const ANIMATION_SCALE_COEF = 2.5;
 const ANIM_ICON_RAISE = 0.15;
-const ANIM_ICON_SCALE = 1.5;
+const ANIM_ICON_SCALE = 2.0;
 
 class Extension {
   constructor() {}
 
   enable() {
-    log('enable watch');
-
     this._iconsContainer = new St.Widget({ name: 'iconsContainer' });
     Main.uiGroup.add_child(this._iconsContainer);
     this._iconsContainer.hide();
@@ -87,11 +86,11 @@ class Extension {
         this._onFullScreen.bind(this)
       )
     );
+
+    log('enable animator');
   }
 
   disable() {
-    log('disable watch');
-
     this._endAnimation();
 
     if (this._intervals) {
@@ -99,6 +98,12 @@ class Extension {
         clearInterval(id);
       });
       this._intervals = [];
+    }
+
+    if (this._iconsContainer) {
+      Main.uiGroup.remove_child(this._iconsContainer);
+      delete this._iconsContainer;
+      this._iconsContainer = null;
     }
 
     if (this.dashContainer) {
@@ -132,12 +137,7 @@ class Extension {
     }
     this._layoutManagerEvents = [];
 
-    if (this._iconsContainer) {
-      this._iconsContainer.show();
-      Main.uiGroup.remove_child(this._iconsContainer);
-      delete this._iconsContainer;
-      this._iconsContainer = null;
-    }
+    log('disable animator');
   }
 
   _findDashContainer() {
@@ -150,7 +150,7 @@ class Extension {
       return false;
     }
 
-    log('dashContainer found!');
+    log('dashtodockContainer found!');
 
     this.dashContainer.set_reactive(true);
     this.dashContainer.set_track_hover(true);
@@ -168,6 +168,9 @@ class Extension {
     this.dashContainerEvents.push(
       this.dashContainer.connect('destroy', () => {
         this.dashContainer = null;
+
+        log('destroy .. restart!');
+
         this.disable();
         setTimeout(this.enable.bind(this), 500);
       })
@@ -239,6 +242,7 @@ class Extension {
       icons.push(bin);
     }
 
+    this.dashContainer._icons = icons;
     return icons;
   }
 
@@ -332,11 +336,16 @@ class Extension {
       bposcenter[1] += bin.first_child.size.height / 2;
       let dst = this._get_distance(pointer, bposcenter);
 
-      if ((nearestDistance == -1 || nearestDistance > dst) && dst < size[0] * 0.8) {
+      if (
+        (nearestDistance == -1 || nearestDistance > dst) &&
+        dst < size[0] * 0.8
+      ) {
         nearestDistance = dst;
         nearestIcon = icon;
         nearestIdx = idx;
         icon._distance = dst;
+        icon._dx = bposcenter[0] - pointer[0];
+        icon._dy = bposcenter[1] - pointer[1];
       }
 
       if (bin._apps) {
@@ -350,18 +359,58 @@ class Extension {
       idx++;
     });
 
+    animateIcons = this._iconsContainer.get_children();
+
     // set animation behavior here
     if (nearestIcon && nearestDistance < iconSize[0] * 2) {
       nearestIcon._target[1] -= iconSize[0] * ANIM_ICON_RAISE;
       nearestIcon._targetScale = ANIM_ICON_SCALE;
+
+      let offset = nearestIcon._dx / 4;
+      let offsetY = (offset < 0 ? -offset : offset) / 2;
+      nearestIcon._target[0] += offset;
+      nearestIcon._target[1] += offsetY;
+
+      let prevLeft = nearestIcon;
+      let prevRight = nearestIcon;
+      let sz = nearestIcon._targetScale;
+
+      for (let i = 1; i < 80; i++) {
+        sz *= 0.8;
+
+        let left = null;
+        let right = null;
+        if (nearestIdx - i >= 0) {
+          left = animateIcons[nearestIdx - i];
+          left._target[0] =
+            (left._target[0] + prevLeft._target[0] * ANIMATION_PULL_COEF) /
+            (ANIMATION_PULL_COEF + 1);
+          left._target[0] -= iconSize[0] * (sz + 0.2);
+          if (sz > 1) {
+            left._targetScale = sz;
+          }
+          prevLeft = left;
+        }
+        if (nearestIdx + i < animateIcons.length) {
+          right = animateIcons[nearestIdx + i];
+          right._target[0] =
+            (right._target[0] + prevRight._target[0] * ANIMATION_PULL_COEF) /
+            (ANIMATION_PULL_COEF + 1);
+          right._target[0] += iconSize[0] * (sz + 0.2);
+          if (sz > 1) {
+            right._targetScale = sz;
+          }
+          prevRight = right;
+        }
+
+        if (!left && !right) break;
+      }
     }
 
     let didAnimate = false;
 
     // animate to target scale and position
-    animateIcons = this._iconsContainer.get_children();
     animateIcons.forEach((icon) => {
-
       let pos = icon._target;
       let scale = icon._targetScale;
       let fromScale = icon.get_scale()[0];
@@ -370,10 +419,14 @@ class Extension {
       let from = this._get_position(icon);
       let dst = this._get_distance(from, icon._target);
 
+      scale =
+        (fromScale * ANIMATION_SCALE_COEF + scale) / (ANIMATION_SCALE_COEF + 1);
+
       if (dst > iconSize[0] * 0.01 && dst < iconSize[0] * 3) {
-        pos[0] = ((from[0] * ANIMATION_POS_COEF) + pos[0]) / (ANIMATION_POS_COEF+1);
-        pos[1] = ((from[1] * ANIMATION_POS_COEF) + pos[1]) / (ANIMATION_POS_COEF+1);
-        scale = ((fromScale * ANIMATION_SCALE_COEF) + scale) / (ANIMATION_SCALE_COEF+1);
+        pos[0] =
+          (from[0] * ANIMATION_POS_COEF + pos[0]) / (ANIMATION_POS_COEF + 1);
+        pos[1] =
+          (from[1] * ANIMATION_POS_COEF + pos[1]) / (ANIMATION_POS_COEF + 1);
         didAnimate = true;
       }
 
@@ -385,7 +438,6 @@ class Extension {
         // why does NaN happen?
         icon.set_position(pos[0], pos[1]);
       }
-
     });
 
     if (didAnimate) {
@@ -437,7 +489,10 @@ class Extension {
       this._timeoutId = null;
     }
     if (this._intervalId == null) {
-      this._intervalId = setInterval(this._animate.bind(this), ANIMATION_INTERVAL);
+      this._intervalId = setInterval(
+        this._animate.bind(this),
+        ANIMATION_INTERVAL
+      );
     }
 
     if (this.dashContainer) {
@@ -451,7 +506,7 @@ class Extension {
       this._intervalId = null;
     }
     this._timeoutId = null;
-    
+
     if (this.dashContainer) {
       this.dashContainer.remove_style_class_name('hi');
     }
