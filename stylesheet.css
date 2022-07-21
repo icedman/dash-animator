@@ -1,8 +1,10 @@
-#animationContainer {
- /*border: 2px solid red;*/
+/* Add your custom extension styling here */
+
+.invisible {
+	/*border:  1px solid magenta;*/
+	color:  rgba(255,0,255,0);
 }
 
 .hi {
- border: 2px solid magenta !important; 
- /*background: magenta;*/
+	border:  1px solid magenta;
 }
