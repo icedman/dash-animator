@@ -37,7 +37,7 @@ const clearTimeout = Me.imports.utils.clearTimeout;
 
 const ANIMATION_INTERVAL = 25;
 const ANIMATION_POS_COEF = 2;
-const ANIMATION_PULL_COEF = 3;
+const ANIMATION_PULL_COEF = 1.5;
 const ANIMATION_SCALE_COEF = 2.5;
 const ANIM_ICON_RAISE = 0.15;
 const ANIM_ICON_SCALE = 2.0;
@@ -302,11 +302,21 @@ class Extension {
     let nearestIdx = -1;
     let nearestIcon = null;
     let nearestDistance = -1;
+    let iconWidth = 32;
     let iconSize = null;
 
     let idx = 0;
 
-    let animateIcons = this._iconsContainer.get_children();
+    let animateIcons = [...this._iconsContainer.get_children()];
+
+    // sort
+    let cornerPos = this._get_position(this.dashContainer);
+    animateIcons.sort((a,b) => {
+      let dstA = this._get_distance(cornerPos, this._get_position(a));
+      let dstB = this._get_distance(cornerPos, this._get_position(a));
+      return (dstA > dstB) ? 1 : -1;
+    });
+
     animateIcons.forEach((icon) => {
       let orphan = true;
       for (let i = 0; i < icons.length; i++) {
@@ -327,6 +337,7 @@ class Extension {
       let size = bin.first_child.get_size();
       if (!iconSize) {
         iconSize = size;
+        iconWidth = size[0];
       }
       bin.set_size(size[0], size[1]);
 
@@ -359,11 +370,9 @@ class Extension {
       idx++;
     });
 
-    animateIcons = this._iconsContainer.get_children();
-
     // set animation behavior here
-    if (nearestIcon && nearestDistance < iconSize[0] * 2) {
-      nearestIcon._target[1] -= iconSize[0] * ANIM_ICON_RAISE;
+    if (nearestIcon && nearestDistance < iconWidth * 2) {
+      nearestIcon._target[1] -= iconWidth * ANIM_ICON_RAISE;
       nearestIcon._targetScale = ANIM_ICON_SCALE;
 
       let offset = nearestIcon._dx / 4;
@@ -385,7 +394,7 @@ class Extension {
           left._target[0] =
             (left._target[0] + prevLeft._target[0] * ANIMATION_PULL_COEF) /
             (ANIMATION_PULL_COEF + 1);
-          left._target[0] -= iconSize[0] * (sz + 0.2);
+          left._target[0] -= iconWidth * (sz + 0.2);
           if (sz > 1) {
             left._targetScale = sz;
           }
@@ -396,7 +405,7 @@ class Extension {
           right._target[0] =
             (right._target[0] + prevRight._target[0] * ANIMATION_PULL_COEF) /
             (ANIMATION_PULL_COEF + 1);
-          right._target[0] += iconSize[0] * (sz + 0.2);
+          right._target[0] += iconWidth * (sz + 0.2);
           if (sz > 1) {
             right._targetScale = sz;
           }
@@ -422,7 +431,7 @@ class Extension {
       scale =
         (fromScale * ANIMATION_SCALE_COEF + scale) / (ANIMATION_SCALE_COEF + 1);
 
-      if (dst > iconSize[0] * 0.01 && dst < iconSize[0] * 3) {
+      if (dst > iconWidth * 0.01 && dst < iconWidth * 3) {
         pos[0] =
           (from[0] * ANIMATION_POS_COEF + pos[0]) / (ANIMATION_POS_COEF + 1);
         pos[1] =
@@ -437,6 +446,7 @@ class Extension {
       if (!isNaN(pos[0]) && !isNaN(pos[1])) {
         // why does NaN happen?
         icon.set_position(pos[0], pos[1]);
+        icon._bin._label.y = pos[1] - iconWidth * scale;
       }
     });
 
@@ -475,12 +485,6 @@ class Extension {
 
   _get_distance(pos1, pos2) {
     return Math.sqrt(this._get_distance_sqr(pos1, pos2));
-  }
-
-  _get_vector(from, to) {
-    let a = to[0] - from[0];
-    let b = to[1] - from[1];
-    return [a, b];
   }
 
   _beginAnimation() {
