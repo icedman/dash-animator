@@ -168,11 +168,11 @@ class Extension {
     this.dashContainerEvents.push(
       this.dashContainer.connect('destroy', () => {
         this.dashContainer = null;
-
-        log('destroy .. restart!');
-
-        this.disable();
-        setTimeout(this.enable.bind(this), 500);
+        let icons = this._iconsContainer.get_children();
+        icons.forEach((icon) => {
+          this._iconsContainer.remove_child(icon);
+        });
+        setTimeout(this._startAnimation.bind(this), 1500);
       })
     );
 
@@ -204,12 +204,12 @@ class Extension {
 
   _findIcons() {
     if (!this.dashContainer) return;
-    let dash = this.dashContainer.find_child_by_name('dash');
-    if (!dash) return [];
+    this.dash = this.dashContainer.find_child_by_name('dash');
+    if (!this.dash) return [];
 
     let icons = [];
 
-    let children = dash.last_child.first_child.last_child.get_children();
+    let children = this.dash.last_child.first_child.last_child.get_children();
     children.forEach((c) => {
       let label = c.label;
       let appwell = c.first_child;
@@ -228,8 +228,9 @@ class Extension {
     });
 
     // apps button
-    if (true) {
-      let apps = dash.last_child.last_child;
+    // determine panel mode first
+    if (false) {
+      let apps = this.dash.last_child.last_child;
       let label = apps.label;
       let button = apps.first_child;
       let icongrid = button.first_child;
@@ -252,6 +253,7 @@ class Extension {
     let existingIcons = this._iconsContainer.get_children();
 
     if (!this._iconsContainer.visible) {
+      // daskToDock code...
       if (this.dashContainer._dockState > 0) {
         this._iconsContainer.show();
       }
@@ -302,21 +304,9 @@ class Extension {
     let nearestIdx = -1;
     let nearestIcon = null;
     let nearestDistance = -1;
-    let iconWidth = 32;
-    let iconSize = null;
+    let iconSize = 32;
 
-    let idx = 0;
-
-    let animateIcons = [...this._iconsContainer.get_children()];
-
-    // sort
-    let cornerPos = this._get_position(this.dashContainer);
-    animateIcons.sort((a,b) => {
-      let dstA = this._get_distance(cornerPos, this._get_position(a));
-      let dstB = this._get_distance(cornerPos, this._get_position(a));
-      return (dstA > dstB) ? 1 : -1;
-    });
-
+    let animateIcons = this._iconsContainer.get_children();
     animateIcons.forEach((icon) => {
       let orphan = true;
       for (let i = 0; i < icons.length; i++) {
@@ -330,16 +320,26 @@ class Extension {
         this._iconsContainer.remove_child(icon);
         return;
       }
+    });
 
+    animateIcons = [...this._iconsContainer.get_children()];
+
+    // sort
+    let cornerPos = this._get_position(this.dashContainer);
+    animateIcons.sort((a, b) => {
+      let dstA = this._get_distance(cornerPos, this._get_position(a));
+      let dstB = this._get_distance(cornerPos, this._get_position(b));
+      return dstA > dstB ? 1 : -1;
+    });
+
+    let idx = 0;
+    animateIcons.forEach((icon) => {
       let bin = icon._bin;
       let pos = this._get_position(bin);
 
-      let size = bin.first_child.get_size();
-      if (!iconSize) {
-        iconSize = size;
-        iconWidth = size[0];
-      }
-      bin.set_size(size[0], size[1]);
+      iconSize = this.dash.iconSize;
+      bin.set_size(iconSize, iconSize);
+      icon.set_size(iconSize, iconSize);
 
       // get nearest
       let bposcenter = [...pos];
@@ -349,7 +349,7 @@ class Extension {
 
       if (
         (nearestDistance == -1 || nearestDistance > dst) &&
-        dst < size[0] * 0.8
+        dst < iconSize * 0.8
       ) {
         nearestDistance = dst;
         nearestIcon = icon;
@@ -371,8 +371,8 @@ class Extension {
     });
 
     // set animation behavior here
-    if (nearestIcon && nearestDistance < iconWidth * 2) {
-      nearestIcon._target[1] -= iconWidth * ANIM_ICON_RAISE;
+    if (nearestIcon && nearestDistance < iconSize * 2) {
+      nearestIcon._target[1] -= iconSize * ANIM_ICON_RAISE;
       nearestIcon._targetScale = ANIM_ICON_SCALE;
 
       let offset = nearestIcon._dx / 4;
@@ -383,6 +383,7 @@ class Extension {
       let prevLeft = nearestIcon;
       let prevRight = nearestIcon;
       let sz = nearestIcon._targetScale;
+      let pull_coef = ANIMATION_PULL_COEF;
 
       for (let i = 1; i < 80; i++) {
         sz *= 0.8;
@@ -392,9 +393,9 @@ class Extension {
         if (nearestIdx - i >= 0) {
           left = animateIcons[nearestIdx - i];
           left._target[0] =
-            (left._target[0] + prevLeft._target[0] * ANIMATION_PULL_COEF) /
-            (ANIMATION_PULL_COEF + 1);
-          left._target[0] -= iconWidth * (sz + 0.2);
+            (left._target[0] + prevLeft._target[0] * pull_coef) /
+            (pull_coef + 1);
+          left._target[0] -= iconSize * (sz + 0.2);
           if (sz > 1) {
             left._targetScale = sz;
           }
@@ -403,9 +404,9 @@ class Extension {
         if (nearestIdx + i < animateIcons.length) {
           right = animateIcons[nearestIdx + i];
           right._target[0] =
-            (right._target[0] + prevRight._target[0] * ANIMATION_PULL_COEF) /
-            (ANIMATION_PULL_COEF + 1);
-          right._target[0] += iconWidth * (sz + 0.2);
+            (right._target[0] + prevRight._target[0] * pull_coef) /
+            (pull_coef + 1);
+          right._target[0] += iconSize * (sz + 0.2);
           if (sz > 1) {
             right._targetScale = sz;
           }
@@ -413,6 +414,8 @@ class Extension {
         }
 
         if (!left && !right) break;
+
+        pull_coef *= 0.9;
       }
     }
 
@@ -431,7 +434,7 @@ class Extension {
       scale =
         (fromScale * ANIMATION_SCALE_COEF + scale) / (ANIMATION_SCALE_COEF + 1);
 
-      if (dst > iconWidth * 0.01 && dst < iconWidth * 3) {
+      if (dst > iconSize * 0.01 && dst < iconSize * 3) {
         pos[0] =
           (from[0] * ANIMATION_POS_COEF + pos[0]) / (ANIMATION_POS_COEF + 1);
         pos[1] =
@@ -446,7 +449,7 @@ class Extension {
       if (!isNaN(pos[0]) && !isNaN(pos[1])) {
         // why does NaN happen?
         icon.set_position(pos[0], pos[1]);
-        icon._bin._label.y = pos[1] - iconWidth * scale;
+        icon._bin._label.y = pos[1] - iconSize * scale * 1.4;
       }
     });
 
@@ -537,13 +540,11 @@ class Extension {
     this._debounceEndAnimation();
   }
 
-  // on drag.. on resize
   _onFocusWindow() {
     this._startAnimation();
   }
 
   _onFullScreen() {
-    log('_onFullScreen');
     if (!this.dashContainer || !this._iconsContainer) return;
     let primary = Main.layoutManager.primaryMonitor;
     if (!primary.inFullscreen) {
