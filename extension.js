@@ -106,6 +106,16 @@ class Extension {
       this._iconsContainer = null;
     }
 
+    if (this.dash) {
+      this.dashEvents.forEach((id) => {
+        if (this.dash) {
+          this.dash.disconnect(id);
+        }
+      });
+      this.dashEvents = [];
+      this.dash = null;
+    }
+
     if (this.dashContainer) {
       this._restoreIcons();
 
@@ -115,7 +125,7 @@ class Extension {
       this.dashContainer.set_reactive(false);
       this.dashContainer.set_track_hover(false);
       this.dashContainerEvents.forEach((id) => {
-        if (this.dashContainer) {
+        if (this.dashContainer) { // needed?
           this.dashContainer.disconnect(id);
         }
       });
@@ -150,7 +160,13 @@ class Extension {
       return false;
     }
 
-    log('dashtodockContainer found!');
+    // log('dashtodockContainer found!');
+
+    this.dash = this.dashContainer.find_child_by_name('dash');
+    this.dashEvents = [];
+    this.dashEvents.push(
+      this.dash.connect('icon-size-changed', this._startAnimation.bind(this))
+    );
 
     this.dashContainer.set_reactive(true);
     this.dashContainer.set_track_hover(true);
@@ -203,9 +219,7 @@ class Extension {
   }
 
   _findIcons() {
-    if (!this.dashContainer) return;
-    this.dash = this.dashContainer.find_child_by_name('dash');
-    if (!this.dash) return [];
+    if (!this.dashContainer || !this.dash) return [];
 
     let icons = [];
 
@@ -300,6 +314,7 @@ class Extension {
 
       let uiIcon = new St.Icon({ name: 'some_icon' });
       uiIcon.icon_name = icon.icon_name;
+
       if (!uiIcon.icon_name) {
         uiIcon.gicon = icon.gicon;
       }
