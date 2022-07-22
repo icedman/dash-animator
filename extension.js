@@ -260,9 +260,33 @@ class Extension {
       return;
     }
 
+    let dock_position = 'bottom';
+    let ix = 0;
+    let iy = 1;
+
     let pivot = new Point();
     pivot.x = 0.5;
     pivot.y = 1.0;
+
+    switch(this.dashContainer._position) {
+      case 1:
+        dock_position = 'right';
+        ix = 1;
+        iy = 0;
+        pivot.x = 1.0;
+        pivot.y = 0.5;
+        break;
+      case 2:
+        dock_position = 'bottom';
+        break;
+      case 3:
+        dock_position = 'left';
+        ix = 1;
+        iy = 0;
+        pivot.x = 0.0;
+        pivot.y = 0.5;
+        break;
+    }
 
     let icons = this._findIcons();
     icons.forEach((bin) => {
@@ -372,13 +396,13 @@ class Extension {
 
     // set animation behavior here
     if (nearestIcon && nearestDistance < iconSize * 2) {
-      nearestIcon._target[1] -= iconSize * ANIM_ICON_RAISE;
+      nearestIcon._target[iy] -= iconSize * ANIM_ICON_RAISE;
       nearestIcon._targetScale = ANIM_ICON_SCALE;
 
       let offset = nearestIcon._dx / 4;
       let offsetY = (offset < 0 ? -offset : offset) / 2;
-      nearestIcon._target[0] += offset;
-      nearestIcon._target[1] += offsetY;
+      nearestIcon._target[ix] += offset;
+      nearestIcon._target[iy] += offsetY;
 
       let prevLeft = nearestIcon;
       let prevRight = nearestIcon;
@@ -392,10 +416,10 @@ class Extension {
         let right = null;
         if (nearestIdx - i >= 0) {
           left = animateIcons[nearestIdx - i];
-          left._target[0] =
-            (left._target[0] + prevLeft._target[0] * pull_coef) /
+          left._target[ix] =
+            (left._target[ix] + prevLeft._target[ix] * pull_coef) /
             (pull_coef + 1);
-          left._target[0] -= iconSize * (sz + 0.2);
+          left._target[ix] -= iconSize * (sz + 0.2);
           if (sz > 1) {
             left._targetScale = sz;
           }
@@ -403,10 +427,10 @@ class Extension {
         }
         if (nearestIdx + i < animateIcons.length) {
           right = animateIcons[nearestIdx + i];
-          right._target[0] =
-            (right._target[0] + prevRight._target[0] * pull_coef) /
+          right._target[ix] =
+            (right._target[ix] + prevRight._target[ix] * pull_coef) /
             (pull_coef + 1);
-          right._target[0] += iconSize * (sz + 0.2);
+          right._target[ix] += iconSize * (sz + 0.2);
           if (sz > 1) {
             right._targetScale = sz;
           }
@@ -449,7 +473,19 @@ class Extension {
       if (!isNaN(pos[0]) && !isNaN(pos[1])) {
         // why does NaN happen?
         icon.set_position(pos[0], pos[1]);
-        icon._bin._label.y = pos[1] - iconSize * scale * 1.4;
+
+        switch(dock_position) {
+          case 'left':
+            icon._bin._label.x = pos[0] + iconSize * scale * 1.1;
+            break;
+          case 'right':
+            icon._bin._label.x = pos[0] - iconSize * scale * 1.1;
+            icon._bin._label.x -= icon._bin._label.width / 1.8;
+            break;
+          case 'bottom':
+            icon._bin._label.y = pos[1] - iconSize * scale * 1.1;
+            break;
+        }
       }
     });
 
