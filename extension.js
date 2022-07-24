@@ -37,7 +37,7 @@ const clearTimeout = Me.imports.utils.clearTimeout;
 
 const ANIMATION_INTERVAL = 25;
 const ANIMATION_POS_COEF = 2;
-const ANIMATION_PULL_COEF = 1.5;
+const ANIMATION_PULL_COEF = 1.8;
 const ANIMATION_SCALE_COEF = 2.5;
 const ANIM_ICON_RAISE = 0.15;
 const ANIM_ICON_SCALE = 2.0;
@@ -125,7 +125,8 @@ class Extension {
       this.dashContainer.set_reactive(false);
       this.dashContainer.set_track_hover(false);
       this.dashContainerEvents.forEach((id) => {
-        if (this.dashContainer) { // needed?
+        if (this.dashContainer) {
+          // needed?
           this.dashContainer.disconnect(id);
         }
       });
@@ -282,7 +283,7 @@ class Extension {
     pivot.x = 0.5;
     pivot.y = 1.0;
 
-    switch(this.dashContainer._position) {
+    switch (this.dashContainer._position) {
       case 1:
         dock_position = 'right';
         ix = 1;
@@ -325,12 +326,13 @@ class Extension {
 
       // spy dragging events
       let draggable = bin._draggable;
-      if (draggable && !draggable._dragBeginId) {
-        draggable._dragBeginId = draggable.connect('drag-begin', () => {
+      if (draggable && !bin._dragBeginId) {
+        bin._dragBeginId = draggable.connect('drag-begin', () => {
           this._dragging = true;
+          this._restoreIcons();
           this.disable();
         });
-        draggable._dragEndId = draggable.connect('drag-end', () => {
+        bin._dragEndId = draggable.connect('drag-end', () => {
           this._dragging = false;
           this.disable();
           this.enable();
@@ -398,11 +400,14 @@ class Extension {
         icon._dy = bposcenter[1] - pointer[1];
       }
 
-      if (bin._apps) {
-        bin.first_child.add_style_class_name('invisible');
-      } else {
-        bin.first_child.hide();
-      }
+      // if (bin._apps) {
+      //   bin.first_child.add_style_class_name('invisible');
+      // } else {
+      //   bin.first_child.hide();
+      // }
+
+      bin.opacity = 0;
+
       icon._target = pos;
       icon._targetScale = 1;
 
@@ -489,7 +494,7 @@ class Extension {
         // why does NaN happen?
         icon.set_position(pos[0], pos[1]);
 
-        switch(dock_position) {
+        switch (dock_position) {
           case 'left':
             icon._bin._label.x = pos[0] + iconSize * scale * 1.1;
             break;
@@ -512,8 +517,18 @@ class Extension {
   _restoreIcons() {
     let icons = this._findIcons();
     icons.forEach((bin) => {
-      bin.first_child.show();
-      bin.first_child.remove_style_class_name('invisible');
+      bin.opacity = 255;
+      if (!this._dragging) {
+        if (bin._dragBeginId) {
+          bin._draggable.disconnect(bin._dragBeginId);
+        }
+        if (bin._dragEndId) {
+          bin._draggable.disconnect(bin._dragEndId);
+        }
+        bin._draggable = null;
+        bin._dragBeginId = null;
+        bin._dragEndId = null;
+      }
     });
   }
 

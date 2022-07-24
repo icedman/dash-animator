@@ -1,6 +1,6 @@
 {
-  "description": "add icon animations to the dash",
-  "name": "Dash Animator",
+  "description": "Animate the icons of dash to dock",
+  "name": "Dash to Dock Animator",
   "original-authors": [
     "icedman"
   ],
