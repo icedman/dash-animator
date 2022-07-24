@@ -37,7 +37,7 @@ const clearTimeout = Me.imports.utils.clearTimeout;
 
 const ANIMATION_INTERVAL = 25;
 const ANIMATION_POS_COEF = 2;
-const ANIMATION_PULL_COEF = 1.5;
+const ANIMATION_PULL_COEF = 1.8;
 const ANIMATION_SCALE_COEF = 2.5;
 const ANIM_ICON_RAISE = 0.15;
 const ANIM_ICON_SCALE = 2.0;
@@ -398,11 +398,14 @@ class Extension {
         icon._dy = bposcenter[1] - pointer[1];
       }
 
-      if (bin._apps) {
-        bin.first_child.add_style_class_name('invisible');
-      } else {
-        bin.first_child.hide();
-      }
+      // if (bin._apps) {
+      //   bin.first_child.add_style_class_name('invisible');
+      // } else {
+      //   bin.first_child.hide();
+      // }
+
+      bin.opacity = 0;
+
       icon._target = pos;
       icon._targetScale = 1;
 
@@ -512,8 +515,9 @@ class Extension {
   _restoreIcons() {
     let icons = this._findIcons();
     icons.forEach((bin) => {
-      bin.first_child.show();
-      bin.first_child.remove_style_class_name('invisible');
+      bin.opacity = 255;
+      // bin.first_child.show();
+      // bin.first_child.remove_style_class_name('invisible');
     });
   }
 
