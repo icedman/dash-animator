@@ -326,13 +326,13 @@ class Extension {
 
       // spy dragging events
       let draggable = bin._draggable;
-      if (draggable && !draggable._dragBeginId) {
-        draggable._dragBeginId = draggable.connect('drag-begin', () => {
+      if (draggable && !bin._dragBeginId) {
+        bin._dragBeginId = draggable.connect('drag-begin', () => {
           this._dragging = true;
           this._restoreIcons();
           this.disable();
         });
-        draggable._dragEndId = draggable.connect('drag-end', () => {
+        bin._dragEndId = draggable.connect('drag-end', () => {
           this._dragging = false;
           this.disable();
           this.enable();
@@ -518,8 +518,17 @@ class Extension {
     let icons = this._findIcons();
     icons.forEach((bin) => {
       bin.opacity = 255;
-      // bin.first_child.show();
-      // bin.first_child.remove_style_class_name('invisible');
+      if (!this._dragging) {
+        if (bin._dragBeginId) {
+          bin._draggable.disconnect(bin._dragBeginId);
+        }
+        if (bin._dragEndId) {
+          bin._draggable.disconnect(bin._dragEndId);
+        }
+        bin._draggable = null;
+        bin._dragBeginId = null;
+        bin._dragEndId = null;
+      }
     });
   }
 
