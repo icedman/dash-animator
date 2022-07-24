@@ -329,6 +329,7 @@ class Extension {
       if (draggable && !draggable._dragBeginId) {
         draggable._dragBeginId = draggable.connect('drag-begin', () => {
           this._dragging = true;
+          this._restoreIcons();
           this.disable();
         });
         draggable._dragEndId = draggable.connect('drag-end', () => {
