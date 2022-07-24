@@ -188,7 +188,7 @@ class Extension {
         icons.forEach((icon) => {
           this._iconsContainer.remove_child(icon);
         });
-        setTimeout(this._startAnimation.bind(this), 1500);
+        // setTimeout(this._startAnimation.bind(this), 1500);
       })
     );
 

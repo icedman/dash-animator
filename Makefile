@@ -3,7 +3,7 @@ all: build install lint
 .PHONY: build install
 
 build:
-	glib-compile-schemas --strict --targetdir=schemas/ schemas
+	echo "glib-compile-schemas --strict --targetdir=schemas/ schemas"
 
 install:
 	mkdir -p ~/.local/share/gnome-shell/extensions/dash-animator@icedman.github.com/
