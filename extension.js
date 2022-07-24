@@ -125,7 +125,8 @@ class Extension {
       this.dashContainer.set_reactive(false);
       this.dashContainer.set_track_hover(false);
       this.dashContainerEvents.forEach((id) => {
-        if (this.dashContainer) { // needed?
+        if (this.dashContainer) {
+          // needed?
           this.dashContainer.disconnect(id);
         }
       });
@@ -282,7 +283,7 @@ class Extension {
     pivot.x = 0.5;
     pivot.y = 1.0;
 
-    switch(this.dashContainer._position) {
+    switch (this.dashContainer._position) {
       case 1:
         dock_position = 'right';
         ix = 1;
@@ -492,7 +493,7 @@ class Extension {
         // why does NaN happen?
         icon.set_position(pos[0], pos[1]);
 
-        switch(dock_position) {
+        switch (dock_position) {
           case 'left':
             icon._bin._label.x = pos[0] + iconSize * scale * 1.1;
             break;
