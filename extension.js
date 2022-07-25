@@ -422,8 +422,8 @@ class Extension {
             (pull_coef + 1);
           left._target[ix] -= iconSize * (sz + 0.2);
 
-          if (left._target[ix] < iconSize/2) {
-            left._target[ix] = iconSize/2;
+          if (left._target[ix] < iconSize / 2) {
+            left._target[ix] = iconSize / 2;
           }
 
           if (sz > 1) {
