@@ -50,20 +50,7 @@ class Extension {
     Main.uiGroup.add_child(this._iconsContainer);
     this._iconsContainer.hide();
 
-    this._overViewEvents = [];
-    this._overViewEvents.push(
-      Main.overview.connect('showing', () => {
-        log('showing');
-      })
-    );
-    this._overViewEvents.push(
-      Main.overview.connect('hidden', () => {
-        log('hidden');
-      })
-    );
-
     this._layoutManagerEvents = [];
-
     if (!this._findDashContainer()) {
       this._layoutManagerEvents.push(
         Main.layoutManager.connect('startup-complete', () => {
@@ -87,7 +74,7 @@ class Extension {
       )
     );
 
-    log('enable animator');
+    // log('enable animator');
   }
 
   disable() {
@@ -134,13 +121,6 @@ class Extension {
       this.dashContainer = null;
     }
 
-    if (this._overViewEvents) {
-      this._overViewEvents.forEach((id) => {
-        Main.overview.disconnect(id);
-      });
-    }
-    this._overViewEvents = [];
-
     if (this._layoutManagerEvents) {
       this._layoutManagerEvents.forEach((id) => {
         Main.layoutManager.disconnect(id);
@@ -148,7 +128,7 @@ class Extension {
     }
     this._layoutManagerEvents = [];
 
-    log('disable animator');
+    // log('disable animator');
   }
 
   _findDashContainer() {
@@ -190,6 +170,7 @@ class Extension {
           this._iconsContainer.remove_child(icon);
         });
         // setTimeout(this._startAnimation.bind(this), 1500);
+        this._startAnimation();
       })
     );
 
@@ -440,6 +421,11 @@ class Extension {
             (left._target[ix] + prevLeft._target[ix] * pull_coef) /
             (pull_coef + 1);
           left._target[ix] -= iconSize * (sz + 0.2);
+
+          if (left._target[ix] < iconSize/2) {
+            left._target[ix] = iconSize/2;
+          }
+
           if (sz > 1) {
             left._targetScale = sz;
           }
