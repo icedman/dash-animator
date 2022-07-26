@@ -17,7 +17,7 @@ publish:
 	cp metadata.json ./build
 	cp stylesheet.css ./build
 	cp README.md ./build
-	cp -R schemas ./build
+	echo "cp -R schemas ./build"
 	rm -rf ./*.zip
 	cd build ; \
 	zip -qr ../dash-animator@icedman.github.com.zip .

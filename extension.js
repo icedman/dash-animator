@@ -35,12 +35,14 @@ const setInterval = Me.imports.utils.setInterval;
 const clearInterval = Me.imports.utils.clearInterval;
 const clearTimeout = Me.imports.utils.clearTimeout;
 
-const ANIMATION_INTERVAL = 25;
-const ANIMATION_POS_COEF = 2;
-const ANIMATION_PULL_COEF = 1.8;
-const ANIMATION_SCALE_COEF = 2.5;
+const ANIM_INTERVAL = 25;
+const ANIM_POS_COEF = 2;
+const ANIM_PULL_COEF = 1.8;
+const ANIM_SCALE_COEF = 2.5;
+const ANIM_ON_LEAVE_COEF = 1.4;
 const ANIM_ICON_RAISE = 0.15;
 const ANIM_ICON_SCALE = 2.0;
+const ANIM_ICON_HIT_AREA = 1.15;
 
 class Extension {
   constructor() {}
@@ -296,7 +298,6 @@ class Extension {
 
       let uiIcon = new St.Icon({ name: 'some_icon' });
       uiIcon.icon_name = icon.icon_name;
-
       if (!uiIcon.icon_name) {
         uiIcon.gicon = icon.gicon;
       }
@@ -342,6 +343,13 @@ class Extension {
         this._iconsContainer.remove_child(icon);
         return;
       }
+
+      // update icon (fix pwa icon)
+      // icon.icon_name = icon._bin.first_child.icon_name;
+      // if (!icon.icon_name) {
+      //   icon.gicon = icon._bin.first_child.gicon;
+      // }
+
     });
 
     animateIcons = [...this._iconsContainer.get_children()];
@@ -371,7 +379,7 @@ class Extension {
 
       if (
         (nearestDistance == -1 || nearestDistance > dst) &&
-        dst < iconSize * 0.8
+        dst < iconSize * ANIM_ICON_HIT_AREA
       ) {
         nearestDistance = dst;
         nearestIcon = icon;
@@ -408,7 +416,7 @@ class Extension {
       let prevLeft = nearestIcon;
       let prevRight = nearestIcon;
       let sz = nearestIcon._targetScale;
-      let pull_coef = ANIMATION_PULL_COEF;
+      let pull_coef = ANIM_PULL_COEF;
 
       for (let i = 1; i < 80; i++) {
         sz *= 0.8;
@@ -461,14 +469,21 @@ class Extension {
       let from = this._get_position(icon);
       let dst = this._get_distance(from, icon._target);
 
+      let _scale_coef = ANIM_SCALE_COEF;
+      let _pos_coef = ANIM_POS_COEF;
+      if (!nearestIcon) {
+        _scale_coef *= ANIM_ON_LEAVE_COEF;
+        _pos_coef *= ANIM_ON_LEAVE_COEF;
+      }
+
       scale =
-        (fromScale * ANIMATION_SCALE_COEF + scale) / (ANIMATION_SCALE_COEF + 1);
+        (fromScale * _scale_coef + scale) / (_scale_coef + 1);
 
       if (dst > iconSize * 0.01 && dst < iconSize * 3) {
         pos[0] =
-          (from[0] * ANIMATION_POS_COEF + pos[0]) / (ANIMATION_POS_COEF + 1);
+          (from[0] * _pos_coef + pos[0]) / (_pos_coef + 1);
         pos[1] =
-          (from[1] * ANIMATION_POS_COEF + pos[1]) / (ANIMATION_POS_COEF + 1);
+          (from[1] * _pos_coef + pos[1]) / (_pos_coef + 1);
         didAnimate = true;
       }
 
@@ -550,7 +565,7 @@ class Extension {
     if (this._intervalId == null) {
       this._intervalId = setInterval(
         this._animate.bind(this),
-        ANIMATION_INTERVAL
+        ANIM_INTERVAL
       );
     }
 
