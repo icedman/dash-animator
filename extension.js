@@ -43,6 +43,7 @@ const ANIM_ON_LEAVE_COEF = 1.4;
 const ANIM_ICON_RAISE = 0.15;
 const ANIM_ICON_SCALE = 2.0;
 const ANIM_ICON_HIT_AREA = 1.15;
+const ANIM_ICON_QUALITY = 2.0;
 
 class Extension {
   constructor() {}
@@ -266,6 +267,9 @@ class Extension {
     pivot.x = 0.5;
     pivot.y = 1.0;
 
+    let scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+    let iconSize = this.dash.iconSize * scaleFactor;
+
     switch (this.dashContainer._position) {
       case 1:
         dock_position = 'right';
@@ -296,14 +300,24 @@ class Extension {
 
       let icon = bin.first_child;
 
-      let uiIcon = new St.Icon({ name: 'some_icon' });
-      uiIcon.icon_name = icon.icon_name;
-      if (!uiIcon.icon_name) {
-        uiIcon.gicon = icon.gicon;
-      }
-      uiIcon.pivot_point = pivot;
+      // let uiIcon = new St.Icon({ name: 'some_icon' });
+      // uiIcon.icon_name = icon.icon_name;
+      // if (!uiIcon.icon_name) {
+      //   uiIcon.gicon = icon.gicon;
+      // }
+      // uiIcon.pivot_point = pivot;
 
+      let uiIcon = new St.Widget({
+        name: 'icon',
+        width: iconSize,
+        height: iconSize,
+      });
+
+      uiIcon.pivot_point = pivot;
       uiIcon._bin = bin;
+
+      // uiIcon.add_style_class_name('hi');
+
       this._iconsContainer.add_child(uiIcon);
 
       // spy dragging events
@@ -311,12 +325,10 @@ class Extension {
       if (draggable && !bin._dragBeginId) {
         bin._dragBeginId = draggable.connect('drag-begin', () => {
           this._dragging = true;
-          this._restoreIcons();
           this.disable();
         });
         bin._dragEndId = draggable.connect('drag-end', () => {
           this._dragging = false;
-          this.disable();
           this.enable();
         });
       }
@@ -327,7 +339,6 @@ class Extension {
     let nearestIdx = -1;
     let nearestIcon = null;
     let nearestDistance = -1;
-    let iconSize = 32;
 
     let animateIcons = this._iconsContainer.get_children();
     animateIcons.forEach((icon) => {
@@ -349,7 +360,6 @@ class Extension {
       // if (!icon.icon_name) {
       //   icon.gicon = icon._bin.first_child.gicon;
       // }
-
     });
 
     animateIcons = [...this._iconsContainer.get_children()];
@@ -367,9 +377,18 @@ class Extension {
       let bin = icon._bin;
       let pos = this._get_position(bin);
 
-      iconSize = this.dash.iconSize;
       bin.set_size(iconSize, iconSize);
       icon.set_size(iconSize, iconSize);
+
+      if (!icon.first_child && bin.first_child) {
+        let img = new St.Icon({
+          name: 'icon',
+          gicon: bin.first_child.gicon,
+        });
+        img.set_icon_size(iconSize * ANIM_ICON_QUALITY);
+        img.set_scale(1 / ANIM_ICON_QUALITY, 1 / ANIM_ICON_QUALITY);
+        icon.add_child(img);
+      }
 
       // get nearest
       let bposcenter = [...pos];
@@ -388,12 +407,6 @@ class Extension {
         icon._dx = bposcenter[0] - pointer[0];
         icon._dy = bposcenter[1] - pointer[1];
       }
-
-      // if (bin._apps) {
-      //   bin.first_child.add_style_class_name('invisible');
-      // } else {
-      //   bin.first_child.hide();
-      // }
 
       bin.opacity = 0;
 
@@ -476,14 +489,11 @@ class Extension {
         _pos_coef *= ANIM_ON_LEAVE_COEF;
       }
 
-      scale =
-        (fromScale * _scale_coef + scale) / (_scale_coef + 1);
+      scale = (fromScale * _scale_coef + scale) / (_scale_coef + 1);
 
       if (dst > iconSize * 0.01 && dst < iconSize * 3) {
-        pos[0] =
-          (from[0] * _pos_coef + pos[0]) / (_pos_coef + 1);
-        pos[1] =
-          (from[1] * _pos_coef + pos[1]) / (_pos_coef + 1);
+        pos[0] = (from[0] * _pos_coef + pos[0]) / (_pos_coef + 1);
+        pos[1] = (from[1] * _pos_coef + pos[1]) / (_pos_coef + 1);
         didAnimate = true;
       }
 
@@ -563,10 +573,7 @@ class Extension {
       this._timeoutId = null;
     }
     if (this._intervalId == null) {
-      this._intervalId = setInterval(
-        this._animate.bind(this),
-        ANIM_INTERVAL
-      );
+      this._intervalId = setInterval(this._animate.bind(this), ANIM_INTERVAL);
     }
 
     if (this.dashContainer) {
