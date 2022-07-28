@@ -263,12 +263,13 @@ class Extension {
     let ix = 0;
     let iy = 1;
 
+    let scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+
     let pivot = new Point();
     pivot.x = 0.5;
     pivot.y = 1.0;
 
-    let scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-    let iconSize = this.dash.iconSize * scaleFactor;
+    let iconSize = this.dash.iconSize;
 
     switch (this.dashContainer._position) {
       case 1:
@@ -290,6 +291,9 @@ class Extension {
         break;
     }
 
+    pivot.x *= scaleFactor;
+    pivot.y *= scaleFactor;
+
     let icons = this._findIcons();
     icons.forEach((bin) => {
       for (let i = 0; i < existingIcons.length; i++) {
@@ -299,13 +303,6 @@ class Extension {
       }
 
       let icon = bin.first_child;
-
-      // let uiIcon = new St.Icon({ name: 'some_icon' });
-      // uiIcon.icon_name = icon.icon_name;
-      // if (!uiIcon.icon_name) {
-      //   uiIcon.gicon = icon.gicon;
-      // }
-      // uiIcon.pivot_point = pivot;
 
       let uiIcon = new St.Widget({
         name: 'icon',
@@ -377,7 +374,7 @@ class Extension {
       let bin = icon._bin;
       let pos = this._get_position(bin);
 
-      bin.set_size(iconSize, iconSize);
+      // bin.set_size(iconSize, iconSize);
       icon.set_size(iconSize, iconSize);
 
       if (!icon.first_child && bin.first_child) {
@@ -392,13 +389,13 @@ class Extension {
 
       // get nearest
       let bposcenter = [...pos];
-      bposcenter[0] += bin.first_child.size.width / 2;
-      bposcenter[1] += bin.first_child.size.height / 2;
+      bposcenter[0] += iconSize * scaleFactor / 2;
+      bposcenter[1] += iconSize * scaleFactor / 2;
       let dst = this._get_distance(pointer, bposcenter);
 
       if (
         (nearestDistance == -1 || nearestDistance > dst) &&
-        dst < iconSize * ANIM_ICON_HIT_AREA
+        dst < iconSize * ANIM_ICON_HIT_AREA * scaleFactor
       ) {
         nearestDistance = dst;
         nearestIcon = icon;
@@ -418,10 +415,14 @@ class Extension {
 
     // set animation behavior here
     if (nearestIcon && nearestDistance < iconSize * 2) {
-      nearestIcon._target[iy] -= iconSize * ANIM_ICON_RAISE;
+      nearestIcon._target[iy] -= iconSize * ANIM_ICON_RAISE * scaleFactor;
       nearestIcon._targetScale = ANIM_ICON_SCALE;
 
-      let offset = nearestIcon._dx / 4;
+      // bring to front
+      // this._iconsContainer.remove_child(nearestIcon);
+      // this._iconsContainer.add_child(nearestIcon);
+
+      let offset = (nearestIcon._dx / 4);
       let offsetY = (offset < 0 ? -offset : offset) / 2;
       nearestIcon._target[ix] += offset;
       nearestIcon._target[iy] += offsetY;
@@ -441,10 +442,10 @@ class Extension {
           left._target[ix] =
             (left._target[ix] + prevLeft._target[ix] * pull_coef) /
             (pull_coef + 1);
-          left._target[ix] -= iconSize * (sz + 0.2);
+          left._target[ix] -= iconSize * (sz + 0.2) * scaleFactor;
 
-          if (left._target[ix] < iconSize / 2) {
-            left._target[ix] = iconSize / 2;
+          if (left._target[ix] < iconSize * scaleFactor / 2) {
+            left._target[ix] = iconSize * scaleFactor / 2;
           }
 
           if (sz > 1) {
@@ -457,7 +458,7 @@ class Extension {
           right._target[ix] =
             (right._target[ix] + prevRight._target[ix] * pull_coef) /
             (pull_coef + 1);
-          right._target[ix] += iconSize * (sz + 0.2);
+          right._target[ix] += iconSize * (sz + 0.2) * scaleFactor;
           if (sz > 1) {
             right._targetScale = sz;
           }
@@ -507,14 +508,14 @@ class Extension {
 
         switch (dock_position) {
           case 'left':
-            icon._bin._label.x = pos[0] + iconSize * scale * 1.1;
+            icon._bin._label.x = pos[0] + iconSize * scale * 1.1 * scaleFactor;
             break;
           case 'right':
-            icon._bin._label.x = pos[0] - iconSize * scale * 1.1;
+            icon._bin._label.x = pos[0] - iconSize * scale * 1.1 * scaleFactor;
             icon._bin._label.x -= icon._bin._label.width / 1.8;
             break;
           case 'bottom':
-            icon._bin._label.y = pos[1] - iconSize * scale * 1.1;
+            icon._bin._label.y = pos[1] - iconSize * scale * 1.1 * scaleFactor;
             break;
         }
       }
