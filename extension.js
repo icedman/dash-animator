@@ -49,6 +49,10 @@ class Extension {
   constructor() {}
 
   enable() {
+    this.enabled = true;
+    this._dragging = false;
+    this._oneShotId = null;
+
     this._iconsContainer = new St.Widget({ name: 'iconsContainer' });
     Main.uiGroup.add_child(this._iconsContainer);
     this._iconsContainer.hide();
@@ -81,6 +85,7 @@ class Extension {
   }
 
   disable() {
+    this.enabled = false;
     this._endAnimation();
 
     if (this._intervals) {
@@ -89,21 +94,9 @@ class Extension {
       });
       this._intervals = [];
     }
-
-    if (this._iconsContainer) {
-      Main.uiGroup.remove_child(this._iconsContainer);
-      delete this._iconsContainer;
-      this._iconsContainer = null;
-    }
-
-    if (this.dash) {
-      this.dashEvents.forEach((id) => {
-        if (this.dash) {
-          this.dash.disconnect(id);
-        }
-      });
-      this.dashEvents = [];
-      this.dash = null;
+    if (this._oneShotId) {
+      clearInterval(this._oneShotId);
+      this._oneShotId = null;
     }
 
     if (this.dashContainer) {
@@ -122,6 +115,22 @@ class Extension {
       });
       this.dashContainerEvents = [];
       this.dashContainer = null;
+    }
+
+    if (this._iconsContainer) {
+      Main.uiGroup.remove_child(this._iconsContainer);
+      delete this._iconsContainer;
+      this._iconsContainer = null;
+    }
+
+    if (this.dash) {
+      this.dashEvents.forEach((id) => {
+        if (this.dash) {
+          this.dash.disconnect(id);
+        }
+      });
+      this.dashEvents = [];
+      this.dash = null;
     }
 
     if (this._layoutManagerEvents) {
@@ -200,6 +209,8 @@ class Extension {
     }
     if (!this.dashContainer) return;
 
+    if (!this.enabled) return;
+
     this._updateIcons();
   }
 
@@ -216,6 +227,8 @@ class Extension {
 
       let draggable = appwell._draggable;
       let widget = appwell.first_child;
+      if (!widget) return;
+      
       let icongrid = widget.first_child;
       let boxlayout = icongrid.first_child;
       let bin = boxlayout.first_child;
@@ -247,7 +260,7 @@ class Extension {
   }
 
   _updateIcons() {
-    if (!this._iconsContainer) return;
+    if (!this._iconsContainer || !this.enabled) return;
 
     let existingIcons = this._iconsContainer.get_children();
 
@@ -326,7 +339,7 @@ class Extension {
         });
         bin._dragEndId = draggable.connect('drag-end', () => {
           this._dragging = false;
-          this.enable();
+          this._oneShotId = setTimeout(this.enable.bind(this), 1500);
         });
       }
     });
