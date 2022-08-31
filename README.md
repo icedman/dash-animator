@@ -4,3 +4,6 @@ This is a Gnome Shell extension that animates the Ubuntu Dock, or more precisely
 
 This works with other distribution using Dash-to-Dock extensions.
 
+
+Check out also Dash2Dock lite which is a total replacement of Dash-to-Dock. It is also animated:
+https://github.com/icedman/dash2dock-lite
