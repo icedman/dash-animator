@@ -168,11 +168,12 @@ class Extension {
     this.dashContainerEvents.push(
       this.dashContainer.connect('destroy', () => {
         this.dashContainer = null;
-        let icons = this._iconsContainer.get_children();
-        icons.forEach((icon) => {
-          this._iconsContainer.remove_child(icon);
-        });
-        // setTimeout(this._startAnimation.bind(this), 1500);
+        if (this._iconsContainer) {
+          let icons = this._iconsContainer.get_children();
+          icons.forEach((icon) => {
+            this._iconsContainer.remove_child(icon);
+          });
+        }
         this._startAnimation();
       })
     );
@@ -219,6 +220,7 @@ class Extension {
       let icongrid = widget.first_child;
       let boxlayout = icongrid.first_child;
       let bin = boxlayout.first_child;
+      if (!bin) return; // ??
       let icon = bin.first_child;
 
       bin._draggable = draggable;
