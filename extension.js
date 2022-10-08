@@ -30,32 +30,23 @@ const Point = imports.gi.Graphene.Point;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
 
+const Animator = Me.imports.animator.Animator;
+
 const setTimeout = Me.imports.utils.setTimeout;
 const setInterval = Me.imports.utils.setInterval;
 const clearInterval = Me.imports.utils.clearInterval;
 const clearTimeout = Me.imports.utils.clearTimeout;
 
-const ANIM_INTERVAL = 25;
-const ANIM_POS_COEF = 2;
-const ANIM_PULL_COEF = 1.8;
-const ANIM_SCALE_COEF = 2.5;
-const ANIM_ON_LEAVE_COEF = 1.4;
-const ANIM_ICON_RAISE = 0.15;
-const ANIM_ICON_SCALE = 2.0;
-const ANIM_ICON_HIT_AREA = 1.15;
-const ANIM_ICON_QUALITY = 2.0;
-
 class Extension {
-  constructor() {}
+  constructor() {
+  }
 
   enable() {
+    this.animator = new Animator();
+
     this.enabled = true;
     this._dragging = false;
     this._oneShotId = null;
-
-    this._iconsContainer = new St.Widget({ name: 'iconsContainer' });
-    Main.uiGroup.add_child(this._iconsContainer);
-    this._iconsContainer.hide();
 
     this._layoutManagerEvents = [];
     if (!this._findDashContainer()) {
@@ -81,12 +72,12 @@ class Extension {
       )
     );
 
-    // log('enable animator');
+    this.animator.enable();
   }
 
   disable() {
     this.enabled = false;
-    this._endAnimation();
+    this.animator.disable();
 
     if (this._intervals) {
       this._intervals.forEach((id) => {
@@ -100,8 +91,6 @@ class Extension {
     }
 
     if (this.dashContainer) {
-      this._restoreIcons();
-
       // unhook
       this.dashContainer._animateIn = this.dashContainer.__animateIn;
       this.dashContainer._animateOut = this.dashContainer.__animateOut;
@@ -144,6 +133,8 @@ class Extension {
   }
 
   _findDashContainer() {
+    log("searching for dash container");
+
     if (this.dashContainer) {
       return false;
     }
@@ -153,7 +144,11 @@ class Extension {
       return false;
     }
 
-    // log('dashtodockContainer found!');
+    this.scale = 1;
+    this.dashContainer.delegate = this;
+    this.animator.dashContainer = this.dashContainer;
+
+    log('dashtodockContainer found!');
 
     this.dash = this.dashContainer.find_child_by_name('dash');
     this.dashEvents = [];
@@ -199,452 +194,113 @@ class Extension {
       this.dashContainer.__animateOut(time, delay);
     };
 
-    this._animate();
+    this.animator._animate();
     return true;
   }
 
-  _animate() {
-    if (!this.dashContainer) {
-      this._findDashContainer();
-    }
-    if (!this.dashContainer) return;
-
-    if (!this.enabled) return;
-
-    this._updateIcons();
-  }
-
   _findIcons() {
-    if (!this.dashContainer || !this.dash) return [];
+    if (!this.dash) return [];
 
-    let icons = [];
+    // hook on showApps
+    if (this.dash.showAppsButton && !this.dash.showAppsButton._checkEventId) {
+      this.dash.showAppsButton._checkEventId = this.dash.showAppsButton.connect(
+        'notify::checked',
+        () => {
+          if (!Main.overview.visible) {
+            Main.uiGroup
+              .find_child_by_name('overview')
+              ._controls._toggleAppsPage();
+          }
+        }
+      );
+    }
 
-    let children = this.dash.last_child.first_child.last_child.get_children();
-    children.forEach((c) => {
+    let icons = this.dash._box.get_children().filter((actor) => {
+      if (actor.child && actor.child._delegate && actor.child._delegate.icon) {
+        return true;
+      }
+      return false;
+    });
+
+    icons.forEach((c) => {
       let label = c.label;
       let appwell = c.first_child;
-      if (!appwell) return; // separator?
-
       let draggable = appwell._draggable;
       let widget = appwell.first_child;
-      if (!widget) return;
-      
       let icongrid = widget.first_child;
       let boxlayout = icongrid.first_child;
       let bin = boxlayout.first_child;
       let icon = bin.first_child;
 
-      bin._draggable = draggable;
-      bin._label = label;
-      icons.push(bin);
+      c._bin = bin;
+      c._label = label;
+      c._draggable = draggable;
+      c._appwell = appwell;
+      if (icon) {
+        c._icon = icon;
+      }
     });
 
-    // apps button
-    // determine panel mode first
-    if (false) {
-      let apps = this.dash.last_child.last_child;
-      let label = apps.label;
-      let button = apps.first_child;
-      let icongrid = button.first_child;
-      let boxlayout = icongrid.first_child;
-      let bin = boxlayout.first_child;
-      let icon = bin.first_child;
-
-      bin._label = label;
-      bin._apps = true;
-      icons.push(bin);
+    try {
+      // this.dash._showAppsIcon;
+      let apps = Main.overview.dash.last_child.last_child;
+      if (apps) {
+        let widget = apps.child;
+        if (widget) {
+          let icongrid = widget.first_child;
+          let boxlayout = icongrid.first_child;
+          let bin = boxlayout.first_child;
+          let icon = bin.first_child;
+          let c = {};
+          c.child = widget;
+          c._bin = bin;
+          c._icon = icon;
+          c._label = widget._delegate.label;
+          icons.push(c);
+        }
+      }
+    } catch (err) {
+      // could happen if ShowApps is hidden
     }
 
     this.dashContainer._icons = icons;
     return icons;
   }
 
-  _updateIcons() {
-    if (!this._iconsContainer || !this.enabled) return;
-
-    let existingIcons = this._iconsContainer.get_children();
-
-    if (!this._iconsContainer.visible) {
-      // daskToDock code...
-      if (this.dashContainer._dockState > 0) {
-        this._iconsContainer.show();
-      }
-      return;
-    }
-
-    let dock_position = 'bottom';
-    let ix = 0;
-    let iy = 1;
-
-    let scaleFactor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-
-    let pivot = new Point();
-    pivot.x = 0.5;
-    pivot.y = 1.0;
-
-    let iconSize = this.dash.iconSize;
-
-    switch (this.dashContainer._position) {
-      case 1:
-        dock_position = 'right';
-        ix = 1;
-        iy = 0;
-        pivot.x = 1.0;
-        pivot.y = 0.5;
-        break;
-      case 2:
-        dock_position = 'bottom';
-        break;
-      case 3:
-        dock_position = 'left';
-        ix = 1;
-        iy = 0;
-        pivot.x = 0.0;
-        pivot.y = 0.5;
-        break;
-    }
-
-    pivot.x *= scaleFactor;
-    pivot.y *= scaleFactor;
-
-    let icons = this._findIcons();
-    icons.forEach((bin) => {
-      for (let i = 0; i < existingIcons.length; i++) {
-        if (existingIcons[i]._bin == bin) {
-          return;
-        }
-      }
-
-      let icon = bin.first_child;
-
-      let uiIcon = new St.Widget({
-        name: 'icon',
-        width: iconSize,
-        height: iconSize,
-      });
-
-      uiIcon.pivot_point = pivot;
-      uiIcon._bin = bin;
-
-      // uiIcon.add_style_class_name('hi');
-
-      this._iconsContainer.add_child(uiIcon);
-
-      // spy dragging events
-      let draggable = bin._draggable;
-      if (draggable && !bin._dragBeginId) {
-        bin._dragBeginId = draggable.connect('drag-begin', () => {
-          this._dragging = true;
-          this.disable();
-        });
-        bin._dragEndId = draggable.connect('drag-end', () => {
-          this._dragging = false;
-          this._oneShotId = setTimeout(this.enable.bind(this), 750);
-        });
-      }
-    });
-
-    let pointer = global.get_pointer();
-
-    let nearestIdx = -1;
-    let nearestIcon = null;
-    let nearestDistance = -1;
-
-    let animateIcons = this._iconsContainer.get_children();
-    animateIcons.forEach((icon) => {
-      let orphan = true;
-      for (let i = 0; i < icons.length; i++) {
-        if (icons[i] == icon._bin) {
-          orphan = false;
-          break;
-        }
-      }
-
-      if (orphan) {
-        this._iconsContainer.remove_child(icon);
-        return;
-      }
-
-      // update icon (fix pwa icon)
-      // icon.icon_name = icon._bin.first_child.icon_name;
-      // if (!icon.icon_name) {
-      //   icon.gicon = icon._bin.first_child.gicon;
-      // }
-    });
-
-    animateIcons = [...this._iconsContainer.get_children()];
-
-    // sort
-    let cornerPos = this._get_position(this.dashContainer);
-    animateIcons.sort((a, b) => {
-      let dstA = this._get_distance(cornerPos, this._get_position(a));
-      let dstB = this._get_distance(cornerPos, this._get_position(b));
-      return dstA > dstB ? 1 : -1;
-    });
-
-    let idx = 0;
-    animateIcons.forEach((icon) => {
-      let bin = icon._bin;
-      let pos = this._get_position(bin);
-
-      // bin.set_size(iconSize, iconSize);
-      icon.set_size(iconSize, iconSize);
-
-      if (!icon.first_child && bin.first_child) {
-        let img = new St.Icon({
-          name: 'icon',
-          gicon: bin.first_child.gicon,
-        });
-        img.set_icon_size(iconSize * ANIM_ICON_QUALITY);
-        img.set_scale(1 / ANIM_ICON_QUALITY, 1 / ANIM_ICON_QUALITY);
-        icon.add_child(img);
-      }
-
-      // get nearest
-      let bposcenter = [...pos];
-      bposcenter[0] += iconSize * scaleFactor / 2;
-      bposcenter[1] += iconSize * scaleFactor / 2;
-      let dst = this._get_distance(pointer, bposcenter);
-
-      if (
-        (nearestDistance == -1 || nearestDistance > dst) &&
-        dst < iconSize * ANIM_ICON_HIT_AREA * scaleFactor
-      ) {
-        nearestDistance = dst;
-        nearestIcon = icon;
-        nearestIdx = idx;
-        icon._distance = dst;
-        icon._dx = bposcenter[0] - pointer[0];
-        icon._dy = bposcenter[1] - pointer[1];
-      }
-
-      bin.opacity = 0;
-
-      icon._target = pos;
-      icon._targetScale = 1;
-
-      idx++;
-    });
-
-    // set animation behavior here
-    if (nearestIcon && nearestDistance < iconSize * 2) {
-      nearestIcon._target[iy] -= iconSize * ANIM_ICON_RAISE * scaleFactor;
-      nearestIcon._targetScale = ANIM_ICON_SCALE;
-
-      // bring to front
-      // this._iconsContainer.remove_child(nearestIcon);
-      // this._iconsContainer.add_child(nearestIcon);
-
-      let offset = (nearestIcon._dx / 4);
-      let offsetY = (offset < 0 ? -offset : offset) / 2;
-      nearestIcon._target[ix] += offset;
-      nearestIcon._target[iy] += offsetY;
-
-      let prevLeft = nearestIcon;
-      let prevRight = nearestIcon;
-      let sz = nearestIcon._targetScale;
-      let pull_coef = ANIM_PULL_COEF;
-
-      for (let i = 1; i < 80; i++) {
-        sz *= 0.8;
-
-        let left = null;
-        let right = null;
-        if (nearestIdx - i >= 0) {
-          left = animateIcons[nearestIdx - i];
-          left._target[ix] =
-            (left._target[ix] + prevLeft._target[ix] * pull_coef) /
-            (pull_coef + 1);
-          left._target[ix] -= iconSize * (sz + 0.2) * scaleFactor;
-
-          if (left._target[ix] < iconSize * scaleFactor / 2) {
-            left._target[ix] = iconSize * scaleFactor / 2;
-          }
-
-          if (sz > 1) {
-            left._targetScale = sz;
-          }
-          prevLeft = left;
-        }
-        if (nearestIdx + i < animateIcons.length) {
-          right = animateIcons[nearestIdx + i];
-          right._target[ix] =
-            (right._target[ix] + prevRight._target[ix] * pull_coef) /
-            (pull_coef + 1);
-          right._target[ix] += iconSize * (sz + 0.2) * scaleFactor;
-          if (sz > 1) {
-            right._targetScale = sz;
-          }
-          prevRight = right;
-        }
-
-        if (!left && !right) break;
-
-        pull_coef *= 0.9;
-      }
-    }
-
-    let didAnimate = false;
-
-    // animate to target scale and position
-    animateIcons.forEach((icon) => {
-      let pos = icon._target;
-      let scale = icon._targetScale;
-      let fromScale = icon.get_scale()[0];
-
-      icon.set_scale(1, 1);
-      let from = this._get_position(icon);
-      let dst = this._get_distance(from, icon._target);
-
-      let _scale_coef = ANIM_SCALE_COEF;
-      let _pos_coef = ANIM_POS_COEF;
-      if (!nearestIcon) {
-        _scale_coef *= ANIM_ON_LEAVE_COEF;
-        _pos_coef *= ANIM_ON_LEAVE_COEF;
-      }
-
-      scale = (fromScale * _scale_coef + scale) / (_scale_coef + 1);
-
-      if (dst > iconSize * 0.01 && dst < iconSize * 3) {
-        pos[0] = (from[0] * _pos_coef + pos[0]) / (_pos_coef + 1);
-        pos[1] = (from[1] * _pos_coef + pos[1]) / (_pos_coef + 1);
-        didAnimate = true;
-      }
-
-      if (!isNaN(scale)) {
-        icon.set_scale(scale, scale);
-      }
-
-      if (!isNaN(pos[0]) && !isNaN(pos[1])) {
-        // why does NaN happen?
-        icon.set_position(pos[0], pos[1]);
-
-        switch (dock_position) {
-          case 'left':
-            icon._bin._label.x = pos[0] + iconSize * scale * 1.1 * scaleFactor;
-            break;
-          case 'right':
-            icon._bin._label.x = pos[0] - iconSize * scale * 1.1 * scaleFactor;
-            icon._bin._label.x -= icon._bin._label.width / 1.8;
-            break;
-          case 'bottom':
-            icon._bin._label.y = pos[1] - iconSize * scale * 1.1 * scaleFactor;
-            break;
-        }
-      }
-    });
-
-    if (didAnimate) {
-      this._debounceEndAnimation();
-    }
-  }
-
-  _restoreIcons() {
-    let icons = this._findIcons();
-    icons.forEach((bin) => {
-      bin.opacity = 255;
-      if (!this._dragging) {
-        if (bin._dragBeginId) {
-          bin._draggable.disconnect(bin._dragBeginId);
-        }
-        if (bin._dragEndId) {
-          bin._draggable.disconnect(bin._dragEndId);
-        }
-        bin._draggable = null;
-        bin._dragBeginId = null;
-        bin._dragEndId = null;
-      }
-    });
-  }
-
-  _get_x(obj) {
-    if (obj == null) return 0;
-    return obj.get_transformed_position()[0];
-  }
-
-  _get_y(obj) {
-    if (obj == null) return 0;
-    return obj.get_transformed_position()[1];
-  }
-
-  _get_position(obj) {
-    return [this._get_x(obj), this._get_y(obj)];
-  }
-
-  _get_distance_sqr(pos1, pos2) {
-    let a = pos1[0] - pos2[0];
-    let b = pos1[1] - pos2[1];
-    return a * a + b * b;
-  }
-
-  _get_distance(pos1, pos2) {
-    return Math.sqrt(this._get_distance_sqr(pos1, pos2));
-  }
-
   _beginAnimation() {
-    if (this._timeoutId) {
-      clearInterval(this._timeoutId);
-      this._timeoutId = null;
-    }
-    if (this._intervalId == null) {
-      this._intervalId = setInterval(this._animate.bind(this), ANIM_INTERVAL);
-    }
-
-    if (this.dashContainer) {
-      // this.dashContainer.add_style_class_name('hi');
-    }
+    this.animator._beginAnimation();
   }
 
   _endAnimation() {
-    if (this._intervalId) {
-      clearInterval(this._intervalId);
-      this._intervalId = null;
-    }
-    this._timeoutId = null;
-
-    if (this.dashContainer) {
-      this.dashContainer.remove_style_class_name('hi');
-    }
+    this.animator._endAnimation();
   }
 
   _debounceEndAnimation() {
-    if (this._timeoutId) {
-      clearInterval(this._timeoutId);
-    }
-    this._timeoutId = setTimeout(this._endAnimation.bind(this), 1500);
+    this.animator._debounceEndAnimation();
   }
 
   _onMotionEvent() {
-    this._onEnterEvent();
+    this.animator._onMotionEvent();
   }
 
   _onEnterEvent() {
-    this._inDash = true;
-    this._startAnimation();
+    this.animator._onEnterEvent();
   }
 
   _onLeaveEvent() {
-    this._inDash = false;
-    this._debounceEndAnimation();
+    this.animator._onLeaveEvent();
   }
 
   _onFocusWindow() {
-    this._startAnimation();
+    this.animator._onFocusWindow();
   }
 
   _onFullScreen() {
-    if (!this.dashContainer || !this._iconsContainer) return;
-    let primary = Main.layoutManager.primaryMonitor;
-    if (!primary.inFullscreen) {
-      this._iconsContainer.show();
-    } else {
-      this._iconsContainer.hide();
-    }
+    this.animator._onFullScreen();
   }
 
   _startAnimation() {
-    this._beginAnimation();
-    this._debounceEndAnimation();
+    this.animator._startAnimation();
   }
 }
 
