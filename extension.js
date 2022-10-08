@@ -339,7 +339,7 @@ class Extension {
         });
         bin._dragEndId = draggable.connect('drag-end', () => {
           this._dragging = false;
-          this._oneShotId = setTimeout(this.enable.bind(this), 1500);
+          this._oneShotId = setTimeout(this.enable.bind(this), 750);
         });
       }
     });
