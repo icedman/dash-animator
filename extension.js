@@ -171,13 +171,10 @@ class Extension {
     );
     this.dashContainerEvents.push(
       this.dashContainer.connect('destroy', () => {
+        this.animator.disable();
+        this.animator.enable();
         this.dashContainer = null;
-        let icons = this._iconsContainer.get_children();
-        icons.forEach((icon) => {
-          this._iconsContainer.remove_child(icon);
-        });
-        // setTimeout(this._startAnimation.bind(this), 1500);
-        this._startAnimation();
+        // this._startAnimation();
       })
     );
 
@@ -199,7 +196,7 @@ class Extension {
   }
 
   _findIcons() {
-    if (!this.dash) return [];
+    if (!this.dash || !this.dashContainer) return [];
 
     // hook on showApps
     if (this.dash.showAppsButton && !this.dash.showAppsButton._checkEventId) {
