@@ -38,8 +38,7 @@ const clearInterval = Me.imports.utils.clearInterval;
 const clearTimeout = Me.imports.utils.clearTimeout;
 
 class Extension {
-  constructor() {
-  }
+  constructor() {}
 
   enable() {
     this.animator = new Animator();
@@ -133,7 +132,7 @@ class Extension {
   }
 
   _findDashContainer() {
-    log("searching for dash container");
+    log('searching for dash container');
 
     if (this.dashContainer) {
       return false;

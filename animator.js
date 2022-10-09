@@ -355,7 +355,7 @@ var Animator = class {
         // todo find appsButton._label
         if (icon._label) {
           // icon._label.y = pos[1] - iconSize * scale * 0.95 * scaleFactor;
-        
+
           switch (dock_position) {
             case 'left':
               icon._label.x = pos[0] + iconSize * scale * 1.1 * scaleFactor;

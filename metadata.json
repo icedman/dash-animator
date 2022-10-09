@@ -5,11 +5,11 @@
     "icedman"
   ],
   "shell-version": [
-    "40", "41", "42"
+    "40", "41", "42", "43"
   ],
   "url": "https://github.com/icedman/dash-animator",
   "uuid": "dash-animator@icedman.github.com",
   "schema-id": "org.gnome.shell.extensions.dash-animator",
   "gettext-domain": "dash-animator",
-  "version": 2
+  "version": 3
 }
