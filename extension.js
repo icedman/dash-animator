@@ -78,6 +78,11 @@ class Extension {
     this.enabled = false;
     this.animator.disable();
 
+    if (this._findDashIntervalId) {
+      clearInterval(this._findDashIntervalId);
+      this._findDashIntervalId = null;
+    }
+
     if (this._intervals) {
       this._intervals.forEach((id) => {
         clearInterval(id);
@@ -143,6 +148,11 @@ class Extension {
       return false;
     }
 
+    if (this._findDashIntervalId) {
+      clearInterval(this._findDashIntervalId);
+      this._findDashIntervalId = null;
+    }
+
     this.scale = 1;
     this.dashContainer.delegate = this;
     this.animator.dashContainer = this.dashContainer;
@@ -173,7 +183,10 @@ class Extension {
         this.animator.disable();
         this.animator.enable();
         this.dashContainer = null;
-        // this._startAnimation();
+        this._findDashIntervalId = setInterval(
+          this._findDashContainer.bind(this),
+          500
+        );
       })
     );
 
@@ -226,6 +239,7 @@ class Extension {
       let icongrid = widget.first_child;
       let boxlayout = icongrid.first_child;
       let bin = boxlayout.first_child;
+      if (!bin) return; // ??
       let icon = bin.first_child;
 
       c._bin = bin;
