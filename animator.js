@@ -89,6 +89,13 @@ var Animator = class {
     let iconSize = this.dash.iconSize;
 
     switch (this.dashContainer._position) {
+      case 0:
+        dock_position = 'top';
+        ix = 0;
+        iy = -1.0;
+        pivot.x = 0.0;
+        pivot.y = 0.0;
+        break;
       case 1:
         dock_position = 'right';
         ix = 1;
@@ -366,6 +373,9 @@ var Animator = class {
               break;
             case 'bottom':
               icon._label.y = pos[1] - iconSize * scale * 1.1 * scaleFactor;
+              break;
+            case 'top':
+              icon._label.y = pos[1] + iconSize * scale * 1.1 * scaleFactor;
               break;
           }
         }
