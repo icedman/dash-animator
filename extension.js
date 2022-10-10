@@ -77,6 +77,7 @@ class Extension {
   disable() {
     this.enabled = false;
     this.animator.disable();
+    this.animator = null;
 
     if (this._findDashIntervalId) {
       clearInterval(this._findDashIntervalId);
@@ -256,7 +257,7 @@ class Extension {
       let apps = Main.overview.dash.last_child.last_child;
       if (apps) {
         let widget = apps.child;
-        if (widget) {
+        if (widget && widget.width > 0) {
           let icongrid = widget.first_child;
           let boxlayout = icongrid.first_child;
           let bin = boxlayout.first_child;

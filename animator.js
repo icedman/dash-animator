@@ -73,6 +73,9 @@ var Animator = class {
     if (!this._iconsContainer || !this.dashContainer) return;
     this.dash = this.dashContainer.dash;
 
+    this._iconsContainer.width = 1;
+    this._iconsContainer.height = 1;
+
     let existingIcons = this._iconsContainer.get_children();
 
     let validPosition = true;
@@ -104,7 +107,7 @@ var Animator = class {
         pivot.y = 0.5;
         break;
       case 2:
-        dock_position = 'bottom';
+        dock_position = 'bottom';        
         break;
       case 3:
         dock_position = 'left';
@@ -441,8 +444,10 @@ var Animator = class {
       clearInterval(this._intervalId);
       this._intervalId = null;
     }
+    if (this._timeoutId) {
+      clearInterval(this._timeoutId);
+    }
     this._timeoutId = null;
-
     if (this.dashContainer) {
       this.dashContainer.remove_style_class_name('hi');
     }
