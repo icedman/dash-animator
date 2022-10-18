@@ -43,6 +43,7 @@ class Extension {
 
   enable() {
     this.animator = new Animator();
+    this.animator.extension = this;
 
     this.enabled = true;
     this._dragging = false;
