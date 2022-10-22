@@ -38,12 +38,17 @@ const clearInterval = Me.imports.utils.clearInterval;
 const clearTimeout = Me.imports.utils.clearTimeout;
 
 class Extension {
-  constructor() {
-  }
+  constructor() {}
 
   enable() {
     this.animator = new Animator();
     this.animator.extension = this;
+
+    // animator setting
+    this.animation_fps = 0;
+    this.animation_magnify = 0.4;
+    this.animation_spread = 0.3;
+    this.animation_rise = 0.1;
 
     this.enabled = true;
     this._dragging = false;
@@ -79,6 +84,12 @@ class Extension {
   disable() {
     this.enabled = false;
     this.animator.disable();
+    this.animator = null;
+
+    if (this._findDashIntervalId) {
+      clearInterval(this._findDashIntervalId);
+      this._findDashIntervalId = null;
+    }
 
     if (this._intervals) {
       this._intervals.forEach((id) => {
@@ -134,7 +145,7 @@ class Extension {
   }
 
   _findDashContainer() {
-    log("searching for dash container");
+    log('searching for dash container');
 
     if (this.dashContainer) {
       return false;
@@ -143,6 +154,11 @@ class Extension {
     this.dashContainer = Main.uiGroup.find_child_by_name('dashtodockContainer');
     if (!this.dashContainer) {
       return false;
+    }
+
+    if (this._findDashIntervalId) {
+      clearInterval(this._findDashIntervalId);
+      this._findDashIntervalId = null;
     }
 
     this.scale = 1;
@@ -175,7 +191,10 @@ class Extension {
         this.animator.disable();
         this.animator.enable();
         this.dashContainer = null;
-        // this._startAnimation();
+        this._findDashIntervalId = setInterval(
+          this._findDashContainer.bind(this),
+          500
+        );
       })
     );
 
@@ -228,6 +247,7 @@ class Extension {
       let icongrid = widget.first_child;
       let boxlayout = icongrid.first_child;
       let bin = boxlayout.first_child;
+      if (!bin) return; // ??
       let icon = bin.first_child;
 
       c._bin = bin;
@@ -244,7 +264,8 @@ class Extension {
       let apps = Main.overview.dash.last_child.last_child;
       if (apps) {
         let widget = apps.child;
-        if (widget) {
+        // account for JustPerfection & dash-to-dock hiding the app button
+        if (widget && widget.width > 0 && widget.get_parent().visible) {
           let icongrid = widget.first_child;
           let boxlayout = icongrid.first_child;
           let bin = boxlayout.first_child;
