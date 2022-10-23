@@ -11,5 +11,5 @@
   "uuid": "dash-animator@icedman.github.com",
   "schema-id": "org.gnome.shell.extensions.dash-animator",
   "gettext-domain": "dash-animator",
-  "version": 4
+  "version": 5
 }

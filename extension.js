@@ -42,6 +42,27 @@ class Extension {
 
   enable() {
     this.animator = new Animator();
+    this.animator.extension = this;
+
+    this.services = {
+      updateIcon: (icon) => {
+        if (icon && icon.icon_name.startsWith('user-trash')) {
+          if (
+            icon._source &&
+            icon._source.first_child &&
+            icon.icon_name != icon._source.first_child.icon_name
+          ) {
+            icon.icon_name = icon._source.first_child.icon_name;
+          }
+        }
+      },
+    };
+
+    // animator setting
+    this.animation_fps = 0;
+    this.animation_magnify = 0.5;
+    this.animation_spread = 0.6;
+    this.animation_rise = 0.2;
 
     this.enabled = true;
     this._dragging = false;
@@ -77,7 +98,6 @@ class Extension {
   disable() {
     this.enabled = false;
     this.animator.disable();
-    this.animator = null;
 
     if (this._findDashIntervalId) {
       clearInterval(this._findDashIntervalId);
@@ -135,6 +155,8 @@ class Extension {
     this._layoutManagerEvents = [];
 
     // log('disable animator');
+
+    this.animator = null;
   }
 
   _findDashContainer() {
