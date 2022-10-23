@@ -42,6 +42,27 @@ class Extension {
 
   enable() {
     this.animator = new Animator();
+    this.animator.extension = this;
+
+    this.services = {
+      updateIcon: (icon) => {
+        if (icon && icon.icon_name && icon.icon_name.startsWith('user-trash')) {
+          if (
+            icon._source &&
+            icon._source.first_child &&
+            icon.icon_name != icon._source.first_child.icon_name
+          ) {
+            icon.icon_name = icon._source.first_child.icon_name;
+          }
+        }
+      },
+    };
+
+    // animator setting
+    this.animation_fps = 0;
+    this.animation_magnify = 0.5;
+    this.animation_spread = 0.6;
+    this.animation_rise = 0.2;
 
     this.enabled = true;
     this._dragging = false;
@@ -77,6 +98,11 @@ class Extension {
   disable() {
     this.enabled = false;
     this.animator.disable();
+
+    if (this._findDashIntervalId) {
+      clearInterval(this._findDashIntervalId);
+      this._findDashIntervalId = null;
+    }
 
     if (this._intervals) {
       this._intervals.forEach((id) => {
@@ -129,6 +155,8 @@ class Extension {
     this._layoutManagerEvents = [];
 
     // log('disable animator');
+
+    this.animator = null;
   }
 
   _findDashContainer() {
@@ -141,6 +169,11 @@ class Extension {
     this.dashContainer = Main.uiGroup.find_child_by_name('dashtodockContainer');
     if (!this.dashContainer) {
       return false;
+    }
+
+    if (this._findDashIntervalId) {
+      clearInterval(this._findDashIntervalId);
+      this._findDashIntervalId = null;
     }
 
     this.scale = 1;
@@ -173,7 +206,10 @@ class Extension {
         this.animator.disable();
         this.animator.enable();
         this.dashContainer = null;
-        // this._startAnimation();
+        this._findDashIntervalId = setInterval(
+          this._findDashContainer.bind(this),
+          500
+        );
       })
     );
 
@@ -243,7 +279,8 @@ class Extension {
       let apps = Main.overview.dash.last_child.last_child;
       if (apps) {
         let widget = apps.child;
-        if (widget) {
+        // account for JustPerfection & dash-to-dock hiding the app button
+        if (widget && widget.width > 0 && widget.get_parent().visible) {
           let icongrid = widget.first_child;
           let boxlayout = icongrid.first_child;
           let bin = boxlayout.first_child;
@@ -265,38 +302,47 @@ class Extension {
   }
 
   _beginAnimation() {
+    if (this.animator)
     this.animator._beginAnimation();
   }
 
   _endAnimation() {
+    if (this.animator)
     this.animator._endAnimation();
   }
 
   _debounceEndAnimation() {
+    if (this.animator)
     this.animator._debounceEndAnimation();
   }
 
   _onMotionEvent() {
+    if (this.animator)
     this.animator._onMotionEvent();
   }
 
   _onEnterEvent() {
+    if (this.animator)
     this.animator._onEnterEvent();
   }
 
   _onLeaveEvent() {
+    if (this.animator)
     this.animator._onLeaveEvent();
   }
 
   _onFocusWindow() {
+    if (this.animator)
     this.animator._onFocusWindow();
   }
 
   _onFullScreen() {
+    if (this.animator)
     this.animator._onFullScreen();
   }
 
   _startAnimation() {
+    if (this.animator)
     this.animator._startAnimation();
   }
 }
