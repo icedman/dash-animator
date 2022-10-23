@@ -302,38 +302,47 @@ class Extension {
   }
 
   _beginAnimation() {
+    if (this.animator)
     this.animator._beginAnimation();
   }
 
   _endAnimation() {
+    if (this.animator)
     this.animator._endAnimation();
   }
 
   _debounceEndAnimation() {
+    if (this.animator)
     this.animator._debounceEndAnimation();
   }
 
   _onMotionEvent() {
+    if (this.animator)
     this.animator._onMotionEvent();
   }
 
   _onEnterEvent() {
+    if (this.animator)
     this.animator._onEnterEvent();
   }
 
   _onLeaveEvent() {
+    if (this.animator)
     this.animator._onLeaveEvent();
   }
 
   _onFocusWindow() {
+    if (this.animator)
     this.animator._onFocusWindow();
   }
 
   _onFullScreen() {
+    if (this.animator)
     this.animator._onFullScreen();
   }
 
   _startAnimation() {
+    if (this.animator)
     this.animator._startAnimation();
   }
 }
