@@ -1,3 +1,7 @@
+# IMPORTANT!
+
+Development of this extension will be limited to bugs and essential/minimal features. Please use Dash2Dock Lite for Animated and Effects-ful Dock.
+
 # Dash Animator for Ubuntu
 
 This is a Gnome Shell extension that animates the Ubuntu Dock, or more precisely, the Dash-to-Dock extension.
