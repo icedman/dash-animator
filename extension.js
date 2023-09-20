@@ -18,28 +18,21 @@
 
 /* exported init */
 
-const Main = imports.ui.main;
-const Dash = imports.ui.dash.Dash;
-const Layout = imports.ui.layout;
-const Shell = imports.gi.Shell;
-const Meta = imports.gi.Meta;
-const St = imports.gi.St;
-const GLib = imports.gi.GLib;
-const Point = imports.gi.Graphene.Point;
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import Graphene from 'gi://Graphene';
 
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
+import { Animator } from './animator.js';
+// import { Timer } from './timer.js';
+import { setTimeout, setInterval, clearInterval, clearTimeout } from './utils.js';
 
-const Animator = Me.imports.animator.Animator;
+import {
+  Extension,
+  gettext as _,
+} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const setTimeout = Me.imports.utils.setTimeout;
-const setInterval = Me.imports.utils.setInterval;
-const clearInterval = Me.imports.utils.clearInterval;
-const clearTimeout = Me.imports.utils.clearTimeout;
+const Point = Graphene.Point;
 
-class Extension {
-  constructor() {}
-
+export default class DashAnimatorExt extends Extension {
   enable() {
     this.animator = new Animator();
     this.animator.extension = this;
@@ -98,6 +91,7 @@ class Extension {
   disable() {
     this.enabled = false;
     this.animator.disable();
+    this.animator = null;
 
     if (this._findDashIntervalId) {
       clearInterval(this._findDashIntervalId);
@@ -155,8 +149,6 @@ class Extension {
     this._layoutManagerEvents = [];
 
     // log('disable animator');
-
-    this.animator = null;
   }
 
   _findDashContainer() {
@@ -302,48 +294,39 @@ class Extension {
   }
 
   _beginAnimation() {
-    if (this.animator)
-    this.animator._beginAnimation();
+    if (this.animator) this.animator._beginAnimation();
   }
 
   _endAnimation() {
-    if (this.animator)
-    this.animator._endAnimation();
+    if (this.animator) this.animator._endAnimation();
   }
 
   _debounceEndAnimation() {
-    if (this.animator)
-    this.animator._debounceEndAnimation();
+    if (this.animator) this.animator._debounceEndAnimation();
   }
 
   _onMotionEvent() {
-    if (this.animator)
-    this.animator._onMotionEvent();
+    if (this.animator) this.animator._onMotionEvent();
   }
 
   _onEnterEvent() {
-    if (this.animator)
-    this.animator._onEnterEvent();
+    if (this.animator) this.animator._onEnterEvent();
   }
 
   _onLeaveEvent() {
-    if (this.animator)
-    this.animator._onLeaveEvent();
+    if (this.animator) this.animator._onLeaveEvent();
   }
 
   _onFocusWindow() {
-    if (this.animator)
-    this.animator._onFocusWindow();
+    if (this.animator) this.animator._onFocusWindow();
   }
 
   _onFullScreen() {
-    if (this.animator)
-    this.animator._onFullScreen();
+    if (this.animator) this.animator._onFullScreen();
   }
 
   _startAnimation() {
-    if (this.animator)
-    this.animator._startAnimation();
+    if (this.animator) this.animator._startAnimation();
   }
 }
 

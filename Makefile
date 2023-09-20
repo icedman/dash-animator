@@ -19,6 +19,7 @@ publish:
 	cp README.md ./build
 	echo "cp -R schemas ./build"
 	rm -rf ./*.zip
+	rm build/timer.js
 	cd build ; \
 	zip -qr ../dash-animator@icedman.github.com.zip .
 

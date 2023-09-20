@@ -1,19 +1,12 @@
-const Main = imports.ui.main;
-const Dash = imports.ui.dash.Dash;
-const Layout = imports.ui.layout;
-const Shell = imports.gi.Shell;
-const Meta = imports.gi.Meta;
-const St = imports.gi.St;
-const GLib = imports.gi.GLib;
-const Point = imports.gi.Graphene.Point;
 
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-const setTimeout = Me.imports.utils.setTimeout;
-const setInterval = Me.imports.utils.setInterval;
-const clearInterval = Me.imports.utils.clearInterval;
-const clearTimeout = Me.imports.utils.clearTimeout;
+import Graphene from 'gi://Graphene';
+import St from 'gi://St';
+
+import { setTimeout, setInterval, clearInterval, clearTimeout } from './utils.js';
+
+const Point = Graphene.Point;
 
 const ANIM_INTERVAL = 15;
 const ANIM_INTERVAL_PAD = 15;
@@ -32,7 +25,7 @@ const ANIM_PREVIEW_DURATION = 1500;
 
 const DOT_CANVAS_SIZE = 96;
 
-var Animator = class {
+export const Animator = class {
   constructor() {
     this._enabled = false;
     this.animationInterval = ANIM_INTERVAL;

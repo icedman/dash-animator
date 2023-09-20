@@ -1,15 +1,15 @@
 {
   "description": "Animate the icons of dash to dock",
-  "name": "Dash to Dock Animator",
+  "name": "Dash Animator",
   "original-authors": [
     "icedman"
   ],
   "shell-version": [
-    "40", "41", "42", "43"
+    "45"
   ],
   "url": "https://github.com/icedman/dash-animator",
   "uuid": "dash-animator@icedman.github.com",
   "schema-id": "org.gnome.shell.extensions.dash-animator",
   "gettext-domain": "dash-animator",
-  "version": 5
+  "version": 8
 }
