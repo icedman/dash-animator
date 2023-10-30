@@ -31,6 +31,8 @@ import {
   gettext as _,
 } from 'resource:///org/gnome/shell/extensions/extension.js';
 
+import { schemaId, SettingsKeys } from './preferences/keys.js';
+
 const Point = Graphene.Point;
 
 const ANIM_ICON_QUALITY = 2.0;
@@ -39,6 +41,8 @@ const ANIM_INTERVAL_PAD = 15;
 
 export default class DashAnimatorExt extends Extension {
   enable() {
+    this._enableSettings();
+
     // three available timers
     // for persistent runs
     this._timer = new Timer('loop timer');
@@ -53,22 +57,14 @@ export default class DashAnimatorExt extends Extension {
     this._loTimer = new Timer('lo-res timer');
     this._loTimer.initialize(750);
 
+    this._updateAnimationFPS();
+    this._updateIconResolution();
+
     this._loTimer.runOnce(() => {
       this._hiTimer.runLoop(() => {
         this._hookDocks();
-      }, 500);
-    }, 750);
-
-    this.icon_size = 0;
-    this.icon_quality = ANIM_ICON_QUALITY;
-    this.animation_fps = 2;
-    this.animation_rise = 0.5;
-    this.animation_spread = 0.2;
-    this.animation_magnify = 0.5;
-    this._vertical = false;
-    this._dash_opacity = 0;
-
-    this._updateAnimationFPS();
+      }, 250);
+    }, 250);
   }
 
   disable() {
@@ -80,6 +76,8 @@ export default class DashAnimatorExt extends Extension {
     this._loTimer = null;
 
     this._releaseDocks();
+
+    this._disableSettings();
   }
 
   _findDocks() {
@@ -118,5 +116,85 @@ export default class DashAnimatorExt extends Extension {
       ANIM_INTERVAL + (this.animation_fps || 0) * ANIM_INTERVAL_PAD;
     this._hiTimer.shutdown();
     this._hiTimer.initialize(this.animationInterval);
+  }
+
+  _updateIconResolution() {
+    this.icon_quality = 1 + [2, 0, 1, 2, 3][this.icon_resolution || 0];
+  }
+
+  _enableSettings() {
+    // default
+    this.icon_quality = ANIM_ICON_QUALITY;
+    this.animation_fps = 2;
+    this.animation_rise = 0.5;
+    this.animation_spread = 0.2;
+    this.animation_magnify = 0.5;
+    this.icon_effect = 2;
+    this.icon_effect_color = [1, 0.5, 0.5, 0.5];
+    this._dash_opacity = 0;
+
+    this._settings = this.getSettings(schemaId);
+    this._settingsKeys = SettingsKeys();
+
+    this._settingsKeys.connectSettings(this._settings, (name, value) => {
+      let n = name.replace(/-/g, '_');
+      this[n] = value;
+
+      // log(`${n} ${value}`);
+
+      switch (name) {
+        case 'animation-fps': {
+          this._updateAnimationFPS();
+          break;
+        }
+        case 'animation-magnify':
+        case 'animation-spread':
+        case 'animation-rise': {
+          // preview mode
+          break;
+        }
+        case 'calendar-icon':
+        case 'clock-icon': {
+          // redraw
+          break;
+        }
+        // problematic settings needing animator restart
+        case 'icon-resolution': {
+          this._updateIconResolution();
+          let docks = this._findDocks();
+          docks.forEach((d) => {
+            if (d.animator) {
+              d.animator._iconsContainer.clear();
+            }
+          });
+          bre;
+          break;
+        }
+        case 'icon-effect':
+        case 'icon-effect-color': {
+          let docks = this._findDocks();
+          docks.forEach((d) => {
+            if (d.animator) {
+              d.animator._updateIconEffect();
+            }
+          });
+          break;
+        }
+      }
+    });
+
+    Object.keys(this._settingsKeys._keys).forEach((k) => {
+      let key = this._settingsKeys.getKey(k);
+      let name = k.replace(/-/g, '_');
+      this[name] = key.value;
+      if (key.options) {
+        this[`${name}_options`] = key.options;
+      }
+    });
+  }
+
+  _disableSettings() {
+    this._settingsKeys.disconnectSettings();
+    this._settingsKeys = null;
   }
 }

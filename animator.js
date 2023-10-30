@@ -9,6 +9,8 @@ const Point = Graphene.Point;
 import { IconsContainer } from './dockItems.js';
 import { Timer } from './timer.js';
 
+import { TintEffect } from './effects/tint_effect.js';
+import { MonochromeEffect } from './effects/monochrome_effect.js';
 import { Animation } from './effects/maclike_animation.js';
 
 const ANIM_POS_COEF = 1.5;
@@ -35,6 +37,8 @@ export let Animator = GObject.registerClass(
     _init(params) {
       super._init({
         name: 'd2dlAnimator',
+        reactive: true,
+        track_hover: true,
         ...(params || {}),
       });
 
@@ -49,17 +53,7 @@ export let Animator = GObject.registerClass(
       Main.uiGroup.insert_child_below(this, dashContainer);
 
       this._hiTimer = this.extension._hiTimer;
-      this._animationSeq = this._hiTimer.runLoop(
-        () => {
-          this.update();
-        },
-        this.extension.animationInterval,
-        'animationTimer'
-      );
-
-      dashContainer.connect('destroy', () => {
-        this.release(dashContainer);
-      });
+      this._beginAnimation();
 
       this._iconsContainer = new IconsContainer({
         name: 'd2dlIconsContainer',
@@ -68,16 +62,43 @@ export let Animator = GObject.registerClass(
       });
 
       Main.uiGroup.insert_child_above(this._iconsContainer, dashContainer);
+
+      this._updateIconEffect();
+
+      this.dashContainer.reactive = true;
+      this.dashContainer.track_hover = true;
+      this.dashContainer.connectObject(
+        'motion-event',
+        this._onMotionEvent.bind(this),
+        'enter-event',
+        this._onEnterEvent.bind(this),
+        'leave-event',
+        this._onLeaveEvent.bind(this),
+        'destroy',
+        () => {
+          this.release(dashContainer);
+        },
+        this
+      );
+
+      this._updateSeq = this._hiTimer.runLoop(() => {
+        this._update();
+      }, 750);
     }
 
     release(dashContainer) {
+      this.extension._hiTimer.cancel(this._updateSeq);
+      
       Main.uiGroup.remove_child(this);
-      this._hiTimer?.shutdown();
-      this._hiTimer = null;
-      this.dashContainer = null;
-      this.dash = null;
+
       dashContainer.animator = null;
       Main.uiGroup.remove_child(this._iconsContainer);
+
+      this.dashContainer.reactive = false;
+      this.dashContainer.track_hover = false;
+      this.dashContainer.disconnectObject(this);
+      this.dashContainer = null;
+      this.dash = null;
     }
 
     _findIcons() {
@@ -178,25 +199,31 @@ export let Animator = GObject.registerClass(
       return icons;
     }
 
-    update() {
-      let targets = [this, this._iconsContainer];
+    _update() {
+      let shouldAnimate = false;
+      let targets = [this];
       targets.forEach((t) => {
         let w = this.dashContainer.width;
         let h = this.dashContainer.height;
         t.x = this.dashContainer.x;
         t.y = this.dashContainer.y - h;
+        if (t.width != w || t.height != h) {
+          shouldAnimate = true;
+        }
         t.width = w;
         t.height = h;
       });
 
-      this._iconsContainer.x = 0;
-
-      this._animate();
+      if (shouldAnimate) {
+        this._beginAnimation();
+      }
     }
 
     _animate() {
       if (!this._iconsContainer || !this.dashContainer) return;
       this.dash = this.dashContainer.dash;
+
+      this.vertical = this.dashContainer.width < this.dashContainer.height;
 
       let icons = this._previousFind;
 
@@ -215,8 +242,14 @@ export let Animator = GObject.registerClass(
       // get monitor scaleFactor
       let monitor = Main.layoutManager.monitors[this.dash._monitorIndex];
       let scaleFactor = monitor.geometry_scale;
-      let iconSize = Math.floor(48); // todo!
+      let iconSize = Math.floor(icons[0]._icon.width + 8);
+
       let iconSpacing = iconSize * (1.2 + this.extension.animation_spread / 4);
+
+      this._iconsContainer.x = monitor.x;
+      this._iconsContainer.y = monitor.y;
+      this._iconsContainer.width = monitor.width;
+      this._iconsContainer.height = monitor.height;
 
       if (this._throttleDown) {
         this._throttleDown--;
@@ -321,13 +354,12 @@ export let Animator = GObject.registerClass(
 
       let idx = 0;
       animateIcons.forEach((icon) => {
-        if (this.extension._vertical) {
+        if (this.vertical) {
           icon._pos[0] = this.dashContainer.x;
           if (this.dashContainer._position == 'right') {
             icon._pos[0] += this.dashContainer.width / 2;
             icon._pos[0] -= (iconSize / 2) * scaleFactor;
           } else {
-            icon._pos[0] += effective_edge_distance;
             icon._pos[0] += this.dashContainer.width / 2;
             icon._pos[0] -= (iconSize / 2) * scaleFactor;
           }
@@ -345,8 +377,8 @@ export let Animator = GObject.registerClass(
           bin.first_child.opacity = this.extension._dash_opacity;
           // todo make this small - so as not to mess up the layout
           // however, the icons appear when released from drag
-          bin.first_child.width = iconSize * 0.8 * scaleFactor;
-          bin.first_child.height = iconSize * 0.8 * scaleFactor;
+          // bin.first_child.width = iconSize * 0.8 * scaleFactor;
+          // bin.first_child.height = iconSize * 0.8 * scaleFactor;
         }
 
         icon.set_size(iconSize, iconSize);
@@ -377,7 +409,7 @@ export let Animator = GObject.registerClass(
         icon._targetSpread = iconSpacing * scaleFactor;
 
         if (icon === firstIcon) {
-          if (this.extension._vertical) {
+          if (this.vertical) {
             if (pos[1] > this.dashContainer.dash.y + iconSize * 2) {
               validPosition = false;
             }
@@ -394,13 +426,10 @@ export let Animator = GObject.registerClass(
       let didAnimate = false;
       let didScale = false;
 
-      let off = (iconSize * scaleFactor) / 2;
       animateIcons.forEach((i) => {
         if (!i._pos) return;
         let p = [...i._pos];
         if (!p) return;
-        p[0] += off;
-        p[1] += off;
         i._pos = p;
       });
 
@@ -423,9 +452,7 @@ export let Animator = GObject.registerClass(
       if (animateIcons.length && nearestIcon) {
         let animation_type = this.extension.animation_type;
 
-        let vertical = this.extension._vertical
-          ? this.dashContainer._position
-          : 0;
+        let vertical = this.vertical ? this.dashContainer._position : 0;
 
         let anim = Animation(animateIcons, pointer, {
           iconsCount: animateIcons.length,
@@ -446,14 +473,14 @@ export let Animator = GObject.registerClass(
 
         // commit
         animateIcons.forEach((i) => {
-          i._target = [i._pos[0] - off, i._pos[1] - off];
+          i._target = [i._pos[0], i._pos[1]];
         });
       }
 
       if (!nearestIcon) {
         animateIcons.forEach((i) => {
           if (!i._container.visible) return;
-          if (this.extension._vertical) {
+          if (this.vertical) {
             i._container.height = iconSpacing * scaleFactor;
           } else {
             i._container.width = iconSpacing * scaleFactor;
@@ -540,7 +567,7 @@ export let Animator = GObject.registerClass(
           targetSpread = iconSpacing * scaleFactor;
         }
 
-        if (this.extension._vertical) {
+        if (this.vertical) {
           let newHeight =
             (icon._container.height * _spread_coef + targetSpread) /
             (_spread_coef + 1);
@@ -558,8 +585,24 @@ export let Animator = GObject.registerClass(
         }
 
         if (!isNaN(pos[0]) && !isNaN(pos[1])) {
-          // icon.set_position(pos[0], pos[1]);
-          icon.set_position(pos[0], 0);
+          switch (dock_position) {
+            case 'bottom':
+              icon.set_position(
+                pos[0] - 2,
+                this.dashContainer.y - this.dashContainer.height + 4
+              );
+              break;
+            case 'right':
+              icon.set_position(
+                this.dashContainer.x - this.dashContainer.width + 4,
+                pos[1] - 2
+              );
+              break;
+            case 'left':
+              icon.set_position(this.dashContainer.x + 8, pos[1] + 2);
+              break;
+          }
+
           icon._pos = [...pos];
           icon._scale = scale;
 
@@ -578,16 +621,25 @@ export let Animator = GObject.registerClass(
                   icon._label.x =
                     (-icon._label.width / 2 + icon.width / 2) * scaleFactor +
                     pos[0];
-                  icon._label.y = pos[1] - iconSize * scale * 0.9 * scaleFactor;
+                  icon._label.y = pos[1] - iconSize * scale * 1.3 * scaleFactor;
                   break;
               }
-              if (this.extension._vertical) {
+              if (this.vertical) {
                 icon._label.y = pos[1];
               }
             }
           }
         }
       });
+
+      if (didScale || this._dragging) {
+        this._debounceEndAnimation();
+      }
+      if (!didAnimate && !this._dragging && this._throttleDown <= 0) {
+        this._throttleDown = THROTTLE_DOWN_FRAMES + THROTTLE_DOWN_DELAY_FRAMES;
+      }
+
+      this._didAnimate = didAnimate;
     }
 
     _get_position(obj) {
@@ -610,13 +662,116 @@ export let Animator = GObject.registerClass(
       let y1 = this.dashContainer.y;
       let x2 = this.dashContainer.x + this.dashContainer.width;
       let y2 = this.dashContainer.y + this.dashContainer.height;
-      if (this.extension._vertical) {
+      if (this.vertical) {
         x1 = this.dashContainer.x;
         x2 += this.dashContainer.width + this._dockExtension.width;
         y1 = this.dashContainer.y;
       }
       let [px, py] = p;
       return px + pad >= x1 && px - pad < x2 && py + pad >= y1 && py - pad < y2;
+    }
+
+    _createEffect(idx) {
+      let effect = null;
+      switch (idx) {
+        case 1: {
+          effect = new TintEffect({
+            name: 'color',
+            color: this.extension.icon_effect_color,
+          });
+          effect.preload(this.extension.path);
+          break;
+        }
+        case 2: {
+          effect = new MonochromeEffect({
+            name: 'color',
+            color: this.extension.icon_effect_color,
+          });
+          effect.preload(this.extension.path);
+          break;
+        }
+      }
+      return effect;
+    }
+
+    _updateIconEffect() {
+      this._iconsContainer.remove_effect_by_name('icon-effect');
+      let effect = this._createEffect(this.extension.icon_effect);
+      if (effect) {
+        this._iconsContainer.add_effect_with_name('icon-effect', effect);
+      }
+      this.iconEffect = effect;
+    }
+
+_beginAnimation(caller) {
+    // if (caller) {
+    //   log(`animation triggered by ${caller}`);
+    // }
+
+    if (this.extension._hiTimer && this._debounceEndSeq) {
+      this.extension._loTimer.runDebounced(this._debounceEndSeq);
+      // this.extension._loTimer.cancel(this._debounceEndSeq);
+    }
+
+    this._throttleDown = 0;
+
+    this.animationInterval = this.extension.animationInterval;
+    if (this.extension._hiTimer) {
+      if (!this._animationSeq) {
+        this._animationSeq = this.extension._hiTimer.runLoop(
+          () => {
+            this._animate();
+          },
+          this.animationInterval,
+          'animationTimer'
+        );
+      } else {
+        this.extension._hiTimer.runLoop(this._animationSeq);
+      }
+    }
+  }
+
+  _endAnimation() {
+    if (this.extension._hiTimer) {
+      this.extension._hiTimer.cancel(this._animationSeq);
+      this.extension._loTimer.cancel(this._debounceEndSeq);
+    }
+    this._relayout = 0;
+    if (this._dockExtension) {
+      this._dockExtension.visible = false;
+    }
+  }
+
+    _debounceEndAnimation() {
+      if (this.extension._loTimer) {
+        if (!this._debounceEndSeq) {
+          this._debounceEndSeq = this.extension._loTimer.runDebounced(
+            () => {
+              this._endAnimation();
+            },
+            ANIM_DEBOUNCE_END_DELAY + this.animationInterval,
+            'debounceEndAnimation'
+          );
+        } else {
+          this.extension._loTimer.runDebounced(this._debounceEndSeq);
+        }
+      }
+    }
+
+    _onButtonEvent() {
+      // button!
+    }
+
+    _onMotionEvent() {
+      this._beginAnimation();
+    }
+
+    _onEnterEvent() {
+      this._beginAnimation();
+    }
+
+    _onLeaveEvent() {
+      this._debounceEndAnimation();
     }
   }
 );
