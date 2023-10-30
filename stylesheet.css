@@ -1,13 +1,11 @@
-/* Add your custom extension styling here */
-
-.invisible {
-	/*border:  1px solid magenta;*/
-	color:  rgba(255,0,255,0);
-}
-
 .hi {
 	border:  1px solid magenta;
 }
 
-  #dashtodockContainer.bottom #dash .dash-item-container .app-well-app.focused .overview-icon {
-    background-color: rgba(238, 238, 236, 0.08) !important; }
+#d2dlAnimator {
+/*	border: 2px solid rgba(255,0, 0, 0.5);*/
+}
+
+#d2dlIconsContainer {
+/*	border: 2px solid rgba(255,0,255, 0.5);*/
+}
